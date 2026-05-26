@@ -40,12 +40,15 @@ Requirements:
 - npm
 - Expo-compatible development device or emulator
 
-Install dependencies:
+Install dependencies from wherever you cloned the repository:
 
 ```bash
-cd "/workspace/coding-projects/clinical-shift-scratchpad"
+git clone https://github.com/Snowslash/clinical-shift-scratchpad.git
+cd clinical-shift-scratchpad
 npm install
 ```
+
+If you already have the repository locally, just `cd` into your local `clinical-shift-scratchpad` folder before running the commands below.
 
 Run automated tests:
 
@@ -81,18 +84,6 @@ Run on web for a quick development smoke test:
 
 ```bash
 npm run web
-```
-
-If working from Windows/WSL, the intended Windows-side location is:
-
-```text
-C:\Users\Sangeev\Documents\Coding Projects\clinical-shift-scratchpad
-```
-
-In this Docker-backed Hermes session the existing Coding Projects mount is:
-
-```text
-/workspace/coding-projects/clinical-shift-scratchpad
 ```
 
 ## Main files
