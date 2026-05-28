@@ -140,6 +140,7 @@ h2 {
 
 .card,
 .feature-section,
+.screenshots,
 .notice,
 .split {
   border: 1px solid var(--line);
@@ -156,11 +157,13 @@ h2 {
 .notice p,
 footer p,
 .feature-list,
-.split ol {
+.split ol,
+figcaption {
   color: var(--muted);
 }
 
 .feature-section,
+.screenshots,
 .notice,
 .split {
   margin-top: 20px;
@@ -183,6 +186,40 @@ footer p,
 .feature-list li,
 .split li {
   margin-bottom: 10px;
+}
+
+.screenshots {
+  background: linear-gradient(135deg, rgba(18, 31, 52, 0.9), rgba(8, 17, 31, 0.84));
+}
+
+.screenshots-heading {
+  max-width: 620px;
+}
+
+.screenshot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 24px;
+}
+
+figure {
+  margin: 0;
+}
+
+figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: #050a12;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.32);
+}
+
+figcaption {
+  margin-top: 10px;
+  font-size: 0.95rem;
 }
 
 .notice {
@@ -216,6 +253,7 @@ footer p {
 
   .grid,
   .feature-section,
+  .screenshot-grid,
   .split {
     grid-template-columns: 1fr;
   }
