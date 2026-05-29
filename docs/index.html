@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en-GB">
+<html lang="en-GB" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -8,15 +8,21 @@
       content="Clinical Shift Scratchpad is a local mobile prototype for tracking temporary ward jobs during a shift."
     />
     <title>Clinical Shift Scratchpad — Sangeev</title>
-    <link rel="stylesheet" href="./styles.css?v=20260529-plain1" />
+    <link rel="stylesheet" href="./styles.css?v=20260529-dark1" />
+    <script src="./theme.js?v=20260529-dark1" defer></script>
   </head>
   <body>
     <header class="site-nav" aria-label="Site navigation">
       <a class="site-nav-brand" href="https://sangeev.me">Sangeev</a>
-      <nav class="site-nav-links" aria-label="Primary">
-        <a href="https://opnotes.sangeev.me">Op notes</a>
-        <a href="https://scratchpad.sangeev.me" aria-current="page">Scratchpad</a>
-      </nav>
+      <div class="site-nav-actions">
+        <nav class="site-nav-links" aria-label="Primary">
+          <a href="https://opnotes.sangeev.me">Op notes</a>
+          <a href="https://scratchpad.sangeev.me" aria-current="page">Scratchpad</a>
+        </nav>
+      <button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch to dark mode" aria-pressed="false">
+        <span aria-hidden="true">☾</span><span>Dark</span>
+      </button>
+      </div>
     </header>
 
     <main>
