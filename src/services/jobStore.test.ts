@@ -22,6 +22,8 @@ const job = (patch: Partial<ClinicalJob>): ClinicalJob => ({
   expiresAt: patch.expiresAt ?? new Date(fixed.getTime() + 24 * 60 * 60 * 1000).toISOString(),
   patientIdentifier: patch.patientIdentifier,
   location: patch.location,
+  jobType: patch.jobType,
+  pinned: patch.pinned,
 });
 
 describe('job creation and expiry', () => {
@@ -59,8 +61,26 @@ describe('JobStore', () => {
     const storage = new MemoryStorage();
     const store = new JobStore(storage);
 
-    expect(await store.saveSettings({ autoDeleteHours: -1 })).toEqual({ autoDeleteHours: 24, locationShortcuts: ['TCI'] });
-    expect(await store.saveSettings({ autoDeleteHours: 500 })).toEqual({ autoDeleteHours: 168, locationShortcuts: ['TCI'] });
+    expect(await store.saveSettings({ autoDeleteHours: -1 })).toEqual({
+      autoDeleteHours: 24,
+      locationShortcuts: ['TCI'],
+      noteShortcuts: ['M', 'F', 'Hb', 'WCC', 'CRP', 'Na', 'K', 'Cr', 'eGFR', 'INR', 'lactate', 'abdo pain'],
+      compactMode: false,
+      appearanceMode: 'system',
+      currentShiftStartedAt: undefined,
+      statusPhraseShortcuts: ['awaiting bloods', 'awaiting CT', 'awaiting reg review', 'family updated', 'discharge letter pending', 'meds prescribed', 'cannula done', 'fluids up'],
+      hapticsEnabled: true,
+    });
+    expect(await store.saveSettings({ autoDeleteHours: 500 })).toEqual({
+      autoDeleteHours: 168,
+      locationShortcuts: ['TCI'],
+      noteShortcuts: ['M', 'F', 'Hb', 'WCC', 'CRP', 'Na', 'K', 'Cr', 'eGFR', 'INR', 'lactate', 'abdo pain'],
+      compactMode: false,
+      appearanceMode: 'system',
+      currentShiftStartedAt: undefined,
+      statusPhraseShortcuts: ['awaiting bloods', 'awaiting CT', 'awaiting reg review', 'family updated', 'discharge letter pending', 'meds prescribed', 'cannula done', 'fluids up'],
+      hapticsEnabled: true,
+    });
   });
 
   it('normalises editable location shortcuts', async () => {
@@ -70,6 +90,121 @@ describe('JobStore', () => {
     const saved = await store.saveSettings({ autoDeleteHours: 24, locationShortcuts: [' TCI ', 'A7', 'A7', '', 'C5'] });
 
     expect(saved.locationShortcuts).toEqual(['TCI', 'A7', 'C5']);
+  });
+
+  it('normalises editable note shortcuts independently of location shortcuts', async () => {
+    const storage = new MemoryStorage();
+    const store = new JobStore(storage);
+
+    const saved = await store.saveSettings({ autoDeleteHours: 24, noteShortcuts: [' M ', 'F', 'Hb', 'Hb', '', 'CT TAP'] });
+
+    expect(saved.noteShortcuts).toEqual(['M', 'F', 'Hb', 'CT TAP']);
+    expect(saved.locationShortcuts).toEqual(['TCI']);
+  });
+
+  it('keeps a larger note shortcut library while the UI uses the first 8 as radial favourites', async () => {
+    const storage = new MemoryStorage();
+    const store = new JobStore(storage);
+    const shortcuts = Array.from({ length: 30 }, (_, index) => `shortcut-${index + 1}`);
+
+    const saved = await store.saveSettings({ autoDeleteHours: 24, noteShortcuts: shortcuts });
+
+    expect(saved.noteShortcuts).toHaveLength(24);
+    expect(saved.noteShortcuts.slice(0, 8)).toEqual(shortcuts.slice(0, 8));
+    expect(saved.noteShortcuts.at(-1)).toBe('shortcut-24');
+  });
+
+
+
+  it('persists compact mode setting independently', async () => {
+    const storage = new MemoryStorage();
+    const store = new JobStore(storage);
+
+    const saved = await store.saveSettings({ autoDeleteHours: 24, compactMode: true });
+
+    expect(saved.compactMode).toBe(true);
+    expect(saved.appearanceMode).toBe('system');
+    expect(saved.locationShortcuts).toEqual(['TCI']);
+  });
+
+  it('persists valid appearance mode and falls back to system for invalid values', async () => {
+    const storage = new MemoryStorage();
+    const store = new JobStore(storage);
+
+    expect((await store.saveSettings({ autoDeleteHours: 24, appearanceMode: 'dark' })).appearanceMode).toBe('dark');
+    expect((await store.saveSettings({ autoDeleteHours: 24, appearanceMode: 'sepia' as never })).appearanceMode).toBe('system');
+  });
+
+  it('creates, toggles, bumps, and duplicates lightweight workflow metadata', async () => {
+    const storage = new MemoryStorage();
+    let now = fixed.getTime();
+    const store = new JobStore(storage, () => now);
+
+    let jobs = await store.addJob({ taskText: 'Review bloods', location: 'A7', urgency: 'soon', jobType: 'bloods' });
+    expect(jobs[0].jobType).toBe('bloods');
+    expect(jobs[0].pinned).toBe(false);
+
+    jobs = await store.togglePinned(jobs[0].id);
+    expect(jobs[0].pinned).toBe(true);
+
+    now += 60_000;
+    jobs = await store.bumpJob(jobs[0].id);
+    expect(jobs[0].updatedAt).toBe('2026-05-25T12:01:00.000Z');
+
+    now += 60_000;
+    jobs = await store.duplicateJob(jobs[0].id);
+    expect(jobs).toHaveLength(2);
+    expect(jobs[0].id).not.toBe(jobs[1].id);
+    expect(jobs[0].taskText).toBe('Review bloods');
+    expect(jobs[0].location).toBe('A7');
+    expect(jobs[0].jobType).toBe('bloods');
+    expect(jobs[0].pinned).toBe(false);
+  });
+
+
+  it('normalises shift settings and status phrase shortcuts', async () => {
+    const storage = new MemoryStorage();
+    const store = new JobStore(storage);
+
+    const saved = await store.saveSettings({
+      autoDeleteHours: 24,
+      currentShiftStartedAt: 'not-a-date',
+      statusPhraseShortcuts: [' awaiting CT ', 'awaiting CT', '', 'reg aware'],
+      hapticsEnabled: false,
+    });
+
+    expect(saved.currentShiftStartedAt).toBeUndefined();
+    expect(saved.statusPhraseShortcuts).toEqual(['awaiting CT', 'reg aware']);
+    expect(saved.hapticsEnabled).toBe(false);
+  });
+
+  it('creates jobs with waiting-for text and updates chase metadata', async () => {
+    const storage = new MemoryStorage();
+    let now = fixed.getTime();
+    const store = new JobStore(storage, () => now);
+
+    let jobs = await store.addJob({ taskText: 'Review CT', urgency: 'soon', waitingFor: ' CT report ' });
+    expect(jobs[0].waitingFor).toBe('CT report');
+    expect(jobs[0].chaseCount).toBeUndefined();
+
+    now += 5 * 60_000;
+    jobs = await store.chaseJob(jobs[0].id);
+
+    expect(jobs[0].waitingFor).toBe('CT report');
+    expect(jobs[0].lastChasedAt).toBe('2026-05-25T12:05:00.000Z');
+    expect(jobs[0].chaseCount).toBe(1);
+    expect(jobs[0].updatedAt).toBe('2026-05-25T12:05:00.000Z');
+  });
+
+  it('starts and ends a local shift in settings without changing jobs', async () => {
+    const storage = new MemoryStorage();
+    const store = new JobStore(storage, () => fixed.getTime());
+
+    const started = await store.startShift();
+    expect(started.currentShiftStartedAt).toBe('2026-05-25T12:00:00.000Z');
+
+    const ended = await store.endShift();
+    expect(ended.currentShiftStartedAt).toBeUndefined();
   });
 
   it('returns a restorable snapshot when deleting a job', async () => {

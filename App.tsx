@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -18,33 +19,38 @@ import {
   View,
 } from 'react-native';
 import { GestureHandlerRootView, LongPressGestureHandler, State } from 'react-native-gesture-handler';
-import { AppSettings, ClinicalJob, DEFAULT_AUTO_DELETE_HOURS, DEFAULT_LOCATION_SHORTCUTS, JobFilter, JobStatus, STATUSES, Urgency } from './src/types/job';
+import { APPEARANCE_MODES, AppearanceMode, AppSettings, ClinicalJob, DEFAULT_APPEARANCE_MODE, DEFAULT_AUTO_DELETE_HOURS, DEFAULT_COMPACT_MODE, DEFAULT_LOCATION_SHORTCUTS, DEFAULT_NOTE_SHORTCUTS, DEFAULT_STATUS_PHRASE_SHORTCUTS, MAX_RADIAL_NOTE_SHORTCUTS, JobFilter, JobStatus, JobType, JOB_TYPES, SORT_PRESETS, SortPreset, STATUSES, Urgency } from './src/types/job';
 import { jobStore } from './src/services/jobStore';
-import { filterJobs, sortJobs } from './src/utils/jobSorting';
+import { filterJobs, groupJobsByLocation, sortJobs } from './src/utils/jobSorting';
 import { buildHandoverText } from './src/utils/handover';
 import { insertTextShortcut } from './src/utils/textShortcuts';
 
-type Screen = 'jobs' | 'settings';
+type Screen = 'jobs' | 'review' | 'settings';
 type JobFormState = {
   id?: string;
   taskText: string;
   patientIdentifier: string;
   location: string;
   urgency: Urgency;
+  jobType?: JobType;
+  waitingFor: string;
 };
 
 type UndoState = {
+  id: string;
   message: string;
   jobs: ClinicalJob[];
 };
 
-type ShortcutContext = 'taskText' | 'location';
+type ShortcutContext = 'taskText' | 'location' | 'waitingFor';
 
 const emptyForm: JobFormState = {
   taskText: '',
   patientIdentifier: '',
   location: '',
   urgency: 'soon',
+  jobType: undefined,
+  waitingFor: '',
 };
 
 const nextStatus: Record<JobStatus, JobStatus> = {
@@ -67,19 +73,56 @@ const statusStyle: Record<JobStatus, { label: string; color: string; backgroundC
   done: { label: 'done', color: '#d1d5db', backgroundColor: '#111827' },
 };
 
+const jobTypeLabels: Record<JobType, string> = {
+  review: 'review',
+  bloods: 'bloods',
+  imaging: 'imaging',
+  call: 'call',
+  family: 'family',
+  discharge: 'discharge',
+  prescribing: 'Rx',
+  handover: 'handover',
+};
+
+const settingsAppearanceIsDark = (systemScheme: 'light' | 'dark' | null | undefined, appearanceMode: AppearanceMode) => {
+  if (appearanceMode === 'dark') return true;
+  if (appearanceMode === 'light') return false;
+  return systemScheme !== 'light';
+};
+
+const appearanceLabels: Record<AppearanceMode, string> = {
+  system: 'System',
+  light: 'Light',
+  dark: 'Dark',
+};
+
+const formatAge = (iso: string, nowMs = Date.now()) => {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return 'unknown';
+  const minutes = Math.max(0, Math.floor((nowMs - then) / 60000));
+  if (minutes < 1) return 'now';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  if (hours < 24) return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}d`;
+};
+
 export default function App() {
   const colorScheme = useColorScheme();
-  const dark = colorScheme !== 'light';
-  const theme = dark ? darkTheme : lightTheme;
-
   const [screen, setScreen] = useState<Screen>('jobs');
   const [jobs, setJobs] = useState<ClinicalJob[]>([]);
-  const [settings, setSettings] = useState<AppSettings>({ autoDeleteHours: DEFAULT_AUTO_DELETE_HOURS, locationShortcuts: DEFAULT_LOCATION_SHORTCUTS });
+  const [settings, setSettings] = useState<AppSettings>({ autoDeleteHours: DEFAULT_AUTO_DELETE_HOURS, locationShortcuts: DEFAULT_LOCATION_SHORTCUTS, noteShortcuts: DEFAULT_NOTE_SHORTCUTS, compactMode: DEFAULT_COMPACT_MODE, appearanceMode: DEFAULT_APPEARANCE_MODE, statusPhraseShortcuts: DEFAULT_STATUS_PHRASE_SHORTCUTS, hapticsEnabled: true });
+  const dark = settingsAppearanceIsDark(colorScheme, settings.appearanceMode);
+  const theme = dark ? darkTheme : lightTheme;
   const [filter, setFilter] = useState<JobFilter>('all');
   const [form, setForm] = useState<JobFormState>(emptyForm);
   const [formVisible, setFormVisible] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [undo, setUndo] = useState<UndoState | null>(null);
+  const [undoStack, setUndoStack] = useState<UndoState[]>([]);
+  const [sortPreset, setSortPreset] = useState<SortPreset>('pinnedFirst');
+  const [groupByLocationEnabled, setGroupByLocationEnabled] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -94,28 +137,45 @@ export default function App() {
   }, [load]);
 
   useEffect(() => {
-    if (!undo) return undefined;
-    const timer = setTimeout(() => setUndo(null), 8000);
+    if (undoStack.length === 0) return undefined;
+    const timer = setTimeout(() => setUndoStack((stack) => stack.slice(1)), 10000);
     return () => clearTimeout(timer);
-  }, [undo]);
+  }, [undoStack]);
+
+  const pulse = async (kind: 'light' | 'success' | 'warning' = 'light') => {
+    if (!settings.hapticsEnabled) return;
+    try {
+      if (kind === 'success') await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      else if (kind === 'warning') await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      else await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Haptics are best-effort only.
+    }
+  };
 
   const showUndo = (message: string, undoJobs: ClinicalJob[]) => {
     if (undoJobs.length === 0) return;
-    setUndo({ message, jobs: undoJobs });
+    setUndoStack((stack) => [...stack.slice(-4), { id: `${Date.now()}-${message}`, message, jobs: undoJobs }]);
   };
 
   const undoLastChange = async () => {
+    const undo = undoStack.at(-1);
     if (!undo) return;
     const restored = await jobStore.restoreJobs(undo.jobs);
     setJobs(restored);
-    setUndo(null);
+    setUndoStack((stack) => stack.slice(0, -1));
+    pulse('warning');
   };
 
-  const visibleJobs = useMemo(() => sortJobs(filterJobs(jobs, filter)), [jobs, filter]);
+  const visibleJobs = useMemo(() => sortJobs(filterJobs(jobs, filter), sortPreset), [jobs, filter, sortPreset]);
   const handoverText = useMemo(() => buildHandoverText(jobs), [jobs]);
+  const visibleGroups = useMemo(() => groupByLocationEnabled ? groupJobsByLocation(visibleJobs) : [], [groupByLocationEnabled, visibleJobs]);
+  const shiftStats = useMemo(() => ({ active: jobs.filter((job) => job.status !== 'done').length, completed: jobs.filter((job) => job.status === 'done').length, total: jobs.length }), [jobs]);
 
-  const openAdd = () => {
-    setForm(emptyForm);
+  const getRecentLocation = () => sortJobs(jobs).find((job) => job.location)?.location ?? '';
+
+  const openAdd = (useRecentLocation = false) => {
+    setForm({ ...emptyForm, location: useRecentLocation ? getRecentLocation() : '' });
     setFormVisible(true);
   };
 
@@ -126,11 +186,13 @@ export default function App() {
       patientIdentifier: job.patientIdentifier ?? '',
       location: job.location ?? '',
       urgency: job.urgency,
+      jobType: job.jobType,
+      waitingFor: job.waitingFor ?? '',
     });
     setFormVisible(true);
   };
 
-  const saveForm = async () => {
+  const saveForm = async (keepOpen = false) => {
     const taskText = form.taskText.trim();
     if (!taskText) {
       Alert.alert('Task needed', 'Free text is the only required field.');
@@ -143,6 +205,8 @@ export default function App() {
         patientIdentifier: form.patientIdentifier.trim() || undefined,
         location: form.location.trim() || undefined,
         urgency: form.urgency,
+        jobType: form.jobType,
+        waitingFor: form.waitingFor.trim() || undefined,
       });
       setJobs(next);
     } else {
@@ -151,6 +215,8 @@ export default function App() {
         patientIdentifier: form.patientIdentifier,
         location: form.location,
         urgency: form.urgency,
+        jobType: form.jobType,
+        waitingFor: form.waitingFor.trim() || undefined,
       });
       setJobs(next);
     }
@@ -166,6 +232,59 @@ export default function App() {
       return;
     }
     setJobs(await jobStore.setStatus(id, status));
+    pulse('light');
+  };
+
+  const togglePinned = async (id: string) => {
+    setJobs(await jobStore.togglePinned(id));
+    pulse('light');
+  };
+
+  const bumpJob = async (id: string) => {
+    setJobs(await jobStore.bumpJob(id));
+    pulse('light');
+  };
+
+  const duplicateJob = async (id: string) => {
+    setJobs(await jobStore.duplicateJob(id));
+    pulse('success');
+  };
+
+  const chaseJob = async (id: string) => {
+    setJobs(await jobStore.chaseJob(id));
+    pulse('light');
+  };
+
+  const startShift = async () => {
+    setSettings(await jobStore.startShift());
+    pulse('success');
+  };
+
+  const endShift = async () => {
+    Alert.alert('End local shift?', 'This only clears the shift timer. Jobs stay on this device unless you clear or wipe them.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'End shift', onPress: async () => { setSettings(await jobStore.endShift()); pulse('warning'); } },
+    ]);
+  };
+
+  const saveCompactMode = async (compactMode: boolean) => {
+    const next = await jobStore.saveSettings({ ...settings, compactMode });
+    setSettings(next);
+  };
+
+  const saveAppearanceMode = async (appearanceMode: AppearanceMode) => {
+    const next = await jobStore.saveSettings({ ...settings, appearanceMode });
+    setSettings(next);
+  };
+
+  const saveHapticsEnabled = async (hapticsEnabled: boolean) => {
+    const next = await jobStore.saveSettings({ ...settings, hapticsEnabled });
+    setSettings(next);
+  };
+
+  const saveStatusPhraseShortcuts = async (value: string) => {
+    const next = await jobStore.saveSettings({ ...settings, statusPhraseShortcuts: parseShortcutText(value) });
+    setSettings(next);
   };
 
   const deleteJob = (job: ClinicalJob) => {
@@ -219,12 +338,18 @@ export default function App() {
     setSettings(next);
   };
 
+  const parseShortcutText = (value: string) => value
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
   const saveLocationShortcuts = async (value: string) => {
-    const shortcuts = value
-      .split(/[\n,]/)
-      .map((item) => item.trim())
-      .filter(Boolean);
-    const next = await jobStore.saveSettings({ ...settings, locationShortcuts: shortcuts });
+    const next = await jobStore.saveSettings({ ...settings, locationShortcuts: parseShortcutText(value) });
+    setSettings(next);
+  };
+
+  const saveNoteShortcuts = async (value: string) => {
+    const next = await jobStore.saveSettings({ ...settings, noteShortcuts: parseShortcutText(value) });
     setSettings(next);
   };
 
@@ -257,7 +382,7 @@ export default function App() {
       </View>
 
       <View style={[styles.tabs, { borderBottomColor: theme.border }]}> 
-        {(['jobs', 'settings'] as Screen[]).map((item) => (
+        {(['jobs', 'review', 'settings'] as Screen[]).map((item) => (
           <TouchableOpacity key={item} style={[styles.tab, screen === item && styles.tabActive]} onPress={() => setScreen(item)}>
             <Text style={[styles.tabText, { color: screen === item ? '#ffffff' : theme.text }]}>{item}</Text>
           </TouchableOpacity>
@@ -269,22 +394,41 @@ export default function App() {
           theme={theme}
           loading={loading}
           jobs={visibleJobs}
+          groups={visibleGroups}
           filter={filter}
           onFilter={setFilter}
+          sortPreset={sortPreset}
+          onSortPreset={setSortPreset}
+          groupByLocationEnabled={groupByLocationEnabled}
+          onToggleGroupByLocation={() => setGroupByLocationEnabled((value) => !value)}
           onEdit={openEdit}
           onDelete={deleteJob}
           onStatus={setJobStatus}
           onCycleStatus={(job) => setJobStatus(job.id, nextStatus[job.status])}
+          onTogglePinned={togglePinned}
+          onBump={bumpJob}
+          onDuplicate={duplicateJob}
+          onChase={chaseJob}
           onClearCompleted={clearCompleted}
           onAdd={openAdd}
+          recentLocation={getRecentLocation()}
+          compactMode={settings.compactMode}
+          shiftStartedAt={settings.currentShiftStartedAt}
+          shiftStats={shiftStats}
+          onStartShift={startShift}
+          onEndShift={endShift}
         />
       ) : null}
 
-      {screen === 'settings' ? (
-        <SettingsScreen theme={theme} settings={settings} onSaveHours={saveAutoDeleteHours} onSaveLocationShortcuts={saveLocationShortcuts} onWipeAll={wipeAll} />
+      {screen === 'review' ? (
+        <HandoverScreen theme={theme} handoverText={handoverText} jobs={jobs} onCopy={copyHandover} onClearCompleted={clearCompleted} onWipeAll={wipeAll} />
       ) : null}
 
-      {undo ? <UndoBar theme={theme} message={undo.message} onUndo={undoLastChange} onDismiss={() => setUndo(null)} /> : null}
+      {screen === 'settings' ? (
+        <SettingsScreen theme={theme} settings={settings} onSaveHours={saveAutoDeleteHours} onSaveLocationShortcuts={saveLocationShortcuts} onSaveNoteShortcuts={saveNoteShortcuts} onSaveStatusPhraseShortcuts={saveStatusPhraseShortcuts} onSaveCompactMode={saveCompactMode} onSaveAppearanceMode={saveAppearanceMode} onSaveHapticsEnabled={saveHapticsEnabled} onWipeAll={wipeAll} />
+      ) : null}
+
+      {undoStack.length > 0 ? <UndoBar theme={theme} message={undoStack.at(-1)?.message ?? 'Undo available'} count={undoStack.length} onUndo={undoLastChange} onDismiss={() => setUndoStack([])} /> : null}
 
       <JobFormModal
         visible={formVisible}
@@ -294,6 +438,8 @@ export default function App() {
         onClose={() => setFormVisible(false)}
         onSave={saveForm}
         locationShortcuts={settings.locationShortcuts}
+        noteShortcuts={settings.noteShortcuts}
+        statusPhraseShortcuts={settings.statusPhraseShortcuts}
       />
     </SafeAreaView>
     </GestureHandlerRootView>
@@ -304,124 +450,215 @@ function JobsScreen({
   theme,
   loading,
   jobs,
+  groups,
   filter,
   onFilter,
+  sortPreset,
+  onSortPreset,
+  groupByLocationEnabled,
+  onToggleGroupByLocation,
   onEdit,
   onDelete,
   onStatus,
   onCycleStatus,
+  onTogglePinned,
+  onBump,
+  onDuplicate,
+  onChase,
   onClearCompleted,
   onAdd,
+  recentLocation,
+  compactMode,
+  shiftStartedAt,
+  shiftStats,
+  onStartShift,
+  onEndShift,
 }: {
   theme: Theme;
   loading: boolean;
   jobs: ClinicalJob[];
+  groups: { location: string; jobs: ClinicalJob[] }[];
   filter: JobFilter;
   onFilter: (filter: JobFilter) => void;
+  sortPreset: SortPreset;
+  onSortPreset: (preset: SortPreset) => void;
+  groupByLocationEnabled: boolean;
+  onToggleGroupByLocation: () => void;
   onEdit: (job: ClinicalJob) => void;
   onDelete: (job: ClinicalJob) => void;
   onStatus: (id: string, status: JobStatus) => void;
   onCycleStatus: (job: ClinicalJob) => void;
+  onTogglePinned: (id: string) => void;
+  onBump: (id: string) => void;
+  onDuplicate: (id: string) => void;
+  onChase: (id: string) => void;
   onClearCompleted: () => void;
-  onAdd: () => void;
+  onAdd: (useRecentLocation?: boolean) => void;
+  recentLocation: string;
+  compactMode: boolean;
+  shiftStartedAt?: string;
+  shiftStats: { active: number; completed: number; total: number };
+  onStartShift: () => void;
+  onEndShift: () => void;
 }) {
+  const renderJob = (item: ClinicalJob) => (
+    <JobCard
+      job={item}
+      theme={theme}
+      compactMode={compactMode}
+      onEdit={() => onEdit(item)}
+      onDelete={() => onDelete(item)}
+      onStatus={(status) => onStatus(item.id, status)}
+      onCycleStatus={() => onCycleStatus(item)}
+      onTogglePinned={() => onTogglePinned(item.id)}
+      onBump={() => onBump(item.id)}
+      onDuplicate={() => onDuplicate(item.id)}
+      onChase={() => onChase(item.id)}
+    />
+  );
+
   return (
     <View style={styles.body}>
-      <View style={styles.filterRow}>
+      <View style={[styles.shiftCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
+        <View style={styles.settingsRowBetween}>
+          <View style={styles.settingsRowText}>
+            <Text style={[styles.sectionSubtitle, { color: theme.text }]}>Shift mode</Text>
+            <Text style={[styles.helpText, { color: theme.muted }]}>{shiftStartedAt ? `Started ${formatAge(shiftStartedAt)} ago · ${shiftStats.active} active · ${shiftStats.completed} done` : 'No local shift timer running'}</Text>
+          </View>
+          <TouchableOpacity style={[styles.toggleButton, { borderColor: theme.border }, shiftStartedAt && styles.toggleButtonActive]} onPress={shiftStartedAt ? onEndShift : onStartShift}>
+            <Text style={{ color: shiftStartedAt ? '#ffffff' : theme.text, fontWeight: '900' }}>{shiftStartedAt ? 'End' : 'Start'}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalControls} contentContainerStyle={styles.horizontalControlContent}>
         {(['all', ...STATUSES] as JobFilter[]).map((item) => (
           <TouchableOpacity key={item} style={[styles.filterChip, { borderColor: theme.border }, filter === item && styles.filterChipActive]} onPress={() => onFilter(item)}>
             <Text style={{ color: filter === item ? '#ffffff' : theme.text, fontWeight: '700' }}>{item}</Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
-      <FlatList
-        data={jobs}
-        keyExtractor={(item) => item.id}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalControls} contentContainerStyle={styles.horizontalControlContent}>
+        {SORT_PRESETS.map((preset) => (
+          <TouchableOpacity key={preset} style={[styles.filterChip, { borderColor: theme.border }, sortPreset === preset && styles.filterChipActive]} onPress={() => onSortPreset(preset)}>
+            <Text style={{ color: sortPreset === preset ? '#ffffff' : theme.text, fontWeight: '700' }}>{preset.replace(/([A-Z])/g, ' $1').toLowerCase()}</Text>
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity style={[styles.filterChip, { borderColor: theme.border }, groupByLocationEnabled && styles.filterChipActive]} onPress={onToggleGroupByLocation}>
+          <Text style={{ color: groupByLocationEnabled ? '#ffffff' : theme.text, fontWeight: '700' }}>group location</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      <FlatList<ClinicalJob | { location: string; jobs: ClinicalJob[] }>
+        data={groupByLocationEnabled ? groups : jobs}
+        keyExtractor={(item) => groupByLocationEnabled ? `group-${(item as unknown as { location: string }).location}` : (item as ClinicalJob).id}
         contentContainerStyle={jobs.length === 0 ? styles.emptyList : styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={[styles.emptyTitle, { color: theme.text }]}>{loading ? 'Loading…' : 'No active jobs'}</Text>
             <Text style={[styles.emptyText, { color: theme.muted }]}>Tap Add. Free text is enough.</Text>
-            <TouchableOpacity style={styles.primaryButtonLarge} onPress={onAdd}>
+            <TouchableOpacity style={styles.primaryButtonLarge} onPress={() => onAdd(false)}>
               <Text style={styles.primaryButtonText}>Add first job</Text>
             </TouchableOpacity>
           </View>
         }
-        renderItem={({ item }) => (
-          <JobCard
-            job={item}
-            theme={theme}
-            onEdit={() => onEdit(item)}
-            onDelete={() => onDelete(item)}
-            onStatus={(status) => onStatus(item.id, status)}
-            onCycleStatus={() => onCycleStatus(item)}
-          />
-        )}
+        renderItem={({ item }) => groupByLocationEnabled ? (
+          <View>
+            <Text style={[styles.groupHeader, { color: theme.text, borderBottomColor: theme.border }]}>{(item as unknown as { location: string; jobs: ClinicalJob[] }).location}</Text>
+            {(item as unknown as { location: string; jobs: ClinicalJob[] }).jobs.map((job) => <View key={job.id}>{renderJob(job)}</View>)}
+          </View>
+        ) : renderJob(item as ClinicalJob)}
       />
 
       {jobs.length > 0 ? (
-        <View style={styles.bottomActionRow}>
-          <TouchableOpacity accessibilityRole="button" style={styles.bottomAddButton} onPress={onAdd}>
-            <Text style={styles.primaryButtonText}>+ Add</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.clearDoneButton, { borderColor: theme.border }]} onPress={onClearCompleted}>
-            <Text style={{ color: theme.text, fontWeight: '700' }}>Clear completed</Text>
-          </TouchableOpacity>
+        <View style={styles.bottomActionColumn}>
+          {recentLocation ? (
+            <TouchableOpacity accessibilityRole="button" style={[styles.sameLocationButton, { borderColor: theme.border, backgroundColor: theme.secondaryActionBackground }]} onPress={() => onAdd(true)}>
+              <Text style={{ color: theme.secondaryActionText, fontWeight: '900' }}>+ Same location: {recentLocation}</Text>
+            </TouchableOpacity>
+          ) : null}
+          <View style={styles.bottomActionRow}>
+            <TouchableOpacity accessibilityRole="button" style={styles.bottomAddButton} onPress={() => onAdd(false)}>
+              <Text style={styles.primaryButtonText}>+ Quick capture</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.clearDoneButton, { borderColor: theme.border, backgroundColor: theme.secondaryActionBackground }]} onPress={onClearCompleted}>
+              <Text style={{ color: theme.secondaryActionText, fontWeight: '800' }}>Clear completed</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       ) : null}
     </View>
   );
 }
 
-function JobCard({ job, theme, onEdit, onDelete, onStatus, onCycleStatus }: { job: ClinicalJob; theme: Theme; onEdit: () => void; onDelete: () => void; onStatus: (status: JobStatus) => void; onCycleStatus: () => void }) {
+function JobCard({ job, theme, compactMode, onEdit, onDelete, onStatus, onCycleStatus, onTogglePinned, onBump, onDuplicate, onChase }: { job: ClinicalJob; theme: Theme; compactMode: boolean; onEdit: () => void; onDelete: () => void; onStatus: (status: JobStatus) => void; onCycleStatus: () => void; onTogglePinned: () => void; onBump: () => void; onDuplicate: () => void; onChase: () => void }) {
+  const updatedLabel = job.status === 'waiting' ? `waiting ${formatAge(job.updatedAt)}` : `updated ${formatAge(job.updatedAt)}`;
   return (
-    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }, job.status === 'done' && styles.doneCard]}>
+    <View style={[styles.card, compactMode && styles.compactCard, { backgroundColor: theme.card, borderColor: theme.border }, job.status === 'done' && styles.doneCard, job.pinned && styles.pinnedCard]}>
       <View style={styles.cardTopRow}>
         <View style={styles.badgeRow}>
+          {job.pinned ? <Badge label="pinned" color="#fef3c7" backgroundColor="#92400e" /> : null}
           <Badge {...urgencyStyle[job.urgency]} />
           <Pressable onPress={onCycleStatus} hitSlop={10}>
             <Badge {...statusStyle[job.status]} label={`${statusStyle[job.status].label} ↻`} />
           </Pressable>
+          {job.jobType ? <Badge label={jobTypeLabels[job.jobType]} color="#dbeafe" backgroundColor="#1e40af" /> : null}
+          {job.chaseCount ? <Badge label={`chased ${job.chaseCount}`} color="#e0e7ff" backgroundColor="#3730a3" /> : null}
         </View>
         <View style={styles.cardActions}>
+          <TouchableOpacity style={styles.iconActionButton} onPress={onTogglePinned}><Text style={{ color: job.pinned ? '#fbbf24' : theme.text, fontWeight: '900' }}>{job.pinned ? '★' : '☆'}</Text></TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={onEdit}><Text style={{ color: theme.text, fontWeight: '700' }}>Edit</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={onDelete}><Text style={{ color: '#fca5a5', fontWeight: '700' }}>Delete</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={onDelete}><Text style={{ color: '#fca5a5', fontWeight: '700' }}>Del</Text></TouchableOpacity>
         </View>
       </View>
 
-      <Text style={[styles.taskText, { color: theme.text }, job.status === 'done' && styles.doneText]}>{job.taskText}</Text>
+      <Text style={[styles.taskText, compactMode && styles.compactTaskText, { color: theme.text }, job.status === 'done' && styles.doneText]} numberOfLines={compactMode ? 2 : undefined}>{job.taskText}</Text>
+      {job.waitingFor ? <Text style={[styles.waitingText, { color: theme.warning }]} numberOfLines={compactMode ? 1 : 2}>Waiting for: {job.waitingFor}</Text> : null}
       <View style={styles.metaRow}>
         {job.location ? <Text style={[styles.metaText, { color: theme.muted }]}>📍 {job.location}</Text> : null}
         {job.patientIdentifier ? <Text style={[styles.metaText, { color: theme.muted }]}>ID: {job.patientIdentifier}</Text> : null}
+        <Text style={[styles.metaText, { color: theme.muted }]}>⏱ {updatedLabel}</Text>
+        {job.lastChasedAt ? <Text style={[styles.metaText, { color: theme.muted }]}>↪ chased {formatAge(job.lastChasedAt)}</Text> : null}
       </View>
 
       <View style={styles.statusRow}>
         {STATUSES.map((status) => (
-          <TouchableOpacity key={status} style={[styles.statusButton, { borderColor: theme.border }, job.status === status && { backgroundColor: statusStyle[status].backgroundColor }]} onPress={() => onStatus(status)}>
+          <TouchableOpacity key={status} style={[styles.statusButton, compactMode && styles.compactStatusButton, { borderColor: theme.border }, job.status === status && { backgroundColor: statusStyle[status].backgroundColor }]} onPress={() => onStatus(status)}>
             <Text style={{ color: job.status === status ? statusStyle[status].color : theme.text, fontSize: 11, fontWeight: '800' }}>{status}</Text>
           </TouchableOpacity>
         ))}
+      </View>
+      <View style={styles.cardUtilityRow}>
+        <TouchableOpacity style={[styles.utilityButton, { borderColor: theme.border }]} onPress={onBump}>
+          <Text style={{ color: theme.text, fontWeight: '800' }}>Bump</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.utilityButton, { borderColor: theme.border }]} onPress={onChase}>
+          <Text style={{ color: theme.text, fontWeight: '800' }}>Chase</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.utilityButton, { borderColor: theme.border }]} onPress={onDuplicate}>
+          <Text style={{ color: theme.text, fontWeight: '800' }}>Duplicate</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-function JobFormModal({ visible, theme, form, onChange, onClose, onSave, locationShortcuts }: { visible: boolean; theme: Theme; form: JobFormState; onChange: (form: JobFormState) => void; onClose: () => void; onSave: () => void; locationShortcuts: string[] }) {
+function JobFormModal({ visible, theme, form, onChange, onClose, onSave, locationShortcuts, noteShortcuts, statusPhraseShortcuts }: { visible: boolean; theme: Theme; form: JobFormState; onChange: (form: JobFormState) => void; onClose: () => void; onSave: (keepOpen?: boolean) => void; locationShortcuts: string[]; noteShortcuts: string[]; statusPhraseShortcuts: string[] }) {
   const taskInputRef = useRef<TextInput>(null);
   const locationInputRef = useRef<TextInput>(null);
+  const waitingInputRef = useRef<TextInput>(null);
   const [shortcutMenu, setShortcutMenu] = useState<ShortcutContext | null>(null);
 
   const openShortcutMenu = (context: ShortcutContext) => {
     if (context === 'taskText') taskInputRef.current?.blur();
     if (context === 'location') locationInputRef.current?.blur();
+    if (context === 'waitingFor') waitingInputRef.current?.blur();
     setShortcutMenu(context);
   };
 
   const handleLongPress = (context: ShortcutContext) => ({ nativeEvent }: { nativeEvent: { state: number } }) => {
-    if (nativeEvent.state === State.ACTIVE) {
-      openShortcutMenu(context);
-    }
+    if (nativeEvent.state === State.ACTIVE) openShortcutMenu(context);
   };
 
   const applyTaskShortcut = (shortcut: string) => {
@@ -436,68 +673,69 @@ function JobFormModal({ visible, theme, form, onChange, onClose, onSave, locatio
     requestAnimationFrame(() => locationInputRef.current?.focus());
   };
 
+  const applyWaitingShortcut = (shortcut: string) => {
+    onChange({ ...form, waitingFor: insertTextShortcut(form.waitingFor, shortcut) });
+    setShortcutMenu(null);
+    requestAnimationFrame(() => waitingInputRef.current?.focus());
+  };
+
+  const menuTitle = shortcutMenu === 'location' ? 'Location shortcuts' : shortcutMenu === 'waitingFor' ? 'Waiting/status phrases' : 'Job note shortcuts';
+  const menuOptions = shortcutMenu === 'location' ? locationShortcuts : shortcutMenu === 'waitingFor' ? statusPhraseShortcuts : noteShortcuts;
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} presentationStyle="pageSheet">
-      <KeyboardAvoidingView
-        style={[styles.modalSafe, { backgroundColor: theme.background }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
-      >
+      <KeyboardAvoidingView style={[styles.modalSafe, { backgroundColor: theme.background }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}>
         <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}> 
-          <TouchableOpacity onPress={onSave} style={[styles.modalHeaderButton, styles.modalSaveButton]}><Text style={styles.modalSaveText}>Save</Text></TouchableOpacity>
-          <Text style={[styles.modalTitle, { color: theme.text }]}>{form.id ? 'Edit job' : 'Fast add'}</Text>
+          <TouchableOpacity onPress={() => onSave(false)} style={[styles.modalHeaderButton, styles.modalSaveButton]}><Text style={styles.modalSaveText}>Save</Text></TouchableOpacity>
+          <Text style={[styles.modalTitle, { color: theme.text }]}>{form.id ? 'Edit job' : 'Quick capture'}</Text>
           <TouchableOpacity onPress={onClose} style={styles.modalHeaderButton}><Text style={{ color: theme.text, fontWeight: '700' }}>Cancel</Text></TouchableOpacity>
         </View>
 
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
-          automaticallyAdjustKeyboardInsets
-          contentContainerStyle={styles.formContent}
-        >
+        <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets contentContainerStyle={styles.formContent}>
           <Text style={[styles.label, { color: theme.text }]}>Job note</Text>
-          <Text style={[styles.fieldHint, { color: theme.muted }]}>Long-press for note shortcuts including M/F, bloods and common phrases.</Text>
+          <Text style={[styles.fieldHint, { color: theme.muted }]}>Long-press for your first 8 note shortcut favourites.</Text>
           <LongPressGestureHandler minDurationMs={420} shouldCancelWhenOutside={false} onHandlerStateChange={handleLongPress('taskText')}>
             <View collapsable={false}>
-              <TextInput
-                ref={taskInputRef}
-                value={form.taskText}
-                onChangeText={(taskText) => onChange({ ...form, taskText })}
-                placeholder="e.g. Review bloods / chase CT / update family"
-                placeholderTextColor={theme.placeholder}
-                multiline
-                scrollEnabled
-                style={[styles.mainInput, { color: theme.text, backgroundColor: theme.card, borderColor: theme.border }]}
-                textAlignVertical="top"
-                returnKeyType="default"
-              />
+              <TextInput ref={taskInputRef} value={form.taskText} onChangeText={(taskText) => onChange({ ...form, taskText })} placeholder="e.g. Review bloods / chase CT / update family" placeholderTextColor={theme.placeholder} multiline scrollEnabled style={[styles.mainInput, { color: theme.text, backgroundColor: theme.card, borderColor: theme.border }]} textAlignVertical="top" returnKeyType="default" />
             </View>
           </LongPressGestureHandler>
+
+          <Text style={[styles.label, { color: theme.text }]}>Waiting for optional</Text>
+          <Text style={[styles.fieldHint, { color: theme.muted }]}>Plain status phrase only. Long-press for local phrases.</Text>
+          <LongPressGestureHandler minDurationMs={420} shouldCancelWhenOutside={false} onHandlerStateChange={handleLongPress('waitingFor')}>
+            <View collapsable={false}>
+              <TextInput ref={waitingInputRef} value={form.waitingFor} onChangeText={(waitingFor) => onChange({ ...form, waitingFor })} placeholder="CT report / bloods / reg review" placeholderTextColor={theme.placeholder} style={[styles.input, { color: theme.text, backgroundColor: theme.card, borderColor: theme.border }]} />
+            </View>
+          </LongPressGestureHandler>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalControls} contentContainerStyle={styles.horizontalControlContent}>
+            {statusPhraseShortcuts.slice(0, 8).map((phrase) => (
+              <TouchableOpacity key={phrase} style={[styles.filterChip, { borderColor: theme.border }]} onPress={() => onChange({ ...form, waitingFor: insertTextShortcut(form.waitingFor, phrase) })}>
+                <Text style={{ color: theme.text, fontWeight: '700' }}>{phrase}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
 
           <Text style={[styles.label, { color: theme.text }]}>Location</Text>
           <Text style={[styles.fieldHint, { color: theme.muted }]}>Long-press for local location shortcuts.</Text>
           <LongPressGestureHandler minDurationMs={420} shouldCancelWhenOutside={false} onHandlerStateChange={handleLongPress('location')}>
             <View collapsable={false}>
-              <TextInput
-                ref={locationInputRef}
-                value={form.location}
-                onChangeText={(location) => onChange({ ...form, location })}
-                placeholder="Ward / area / bed"
-                placeholderTextColor={theme.placeholder}
-                style={[styles.input, { color: theme.text, backgroundColor: theme.card, borderColor: theme.border }]}
-              />
+              <TextInput ref={locationInputRef} value={form.location} onChangeText={(location) => onChange({ ...form, location })} placeholder="Ward / area / bed" placeholderTextColor={theme.placeholder} style={[styles.input, { color: theme.text, backgroundColor: theme.card, borderColor: theme.border }]} />
             </View>
           </LongPressGestureHandler>
 
           <Text style={[styles.label, { color: theme.text }]}>Patient identifier optional</Text>
           <Text style={[styles.helpText, { color: theme.muted }]}>Use the minimum necessary identifier for your local shift context. Avoid full details unless genuinely needed.</Text>
-          <TextInput
-            value={form.patientIdentifier}
-            onChangeText={(patientIdentifier) => onChange({ ...form, patientIdentifier })}
-            placeholder="Minimum necessary identifier"
-            placeholderTextColor={theme.placeholder}
-            style={[styles.input, { color: theme.text, backgroundColor: theme.card, borderColor: theme.border }]}
-          />
+          <TextInput value={form.patientIdentifier} onChangeText={(patientIdentifier) => onChange({ ...form, patientIdentifier })} placeholder="Minimum necessary identifier" placeholderTextColor={theme.placeholder} style={[styles.input, { color: theme.text, backgroundColor: theme.card, borderColor: theme.border }]} />
+
+          <Text style={[styles.label, { color: theme.text }]}>Job type optional</Text>
+          <Text style={[styles.fieldHint, { color: theme.muted }]}>Plain local label only — not triage, priority, or decision support.</Text>
+          <View style={styles.typeChipRow}>
+            {JOB_TYPES.map((jobType) => (
+              <TouchableOpacity key={jobType} style={[styles.typeChip, { borderColor: theme.border }, form.jobType === jobType && styles.typeChipActive]} onPress={() => onChange({ ...form, jobType: form.jobType === jobType ? undefined : jobType })}>
+                <Text style={{ color: form.jobType === jobType ? '#ffffff' : theme.text, fontWeight: '900' }}>{jobTypeLabels[jobType]}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           <Text style={[styles.label, { color: theme.text }]}>Urgency</Text>
           <View style={styles.segmentedRow}>
@@ -507,32 +745,46 @@ function JobFormModal({ visible, theme, form, onChange, onClose, onSave, locatio
               </TouchableOpacity>
             ))}
           </View>
+
+          {!form.id ? (
+            <TouchableOpacity style={styles.primaryButtonLarge} onPress={() => onSave(true)}>
+              <Text style={styles.primaryButtonText}>Add + keep open</Text>
+            </TouchableOpacity>
+          ) : null}
         </ScrollView>
 
-        <ShortcutMenu
-          visible={shortcutMenu !== null}
-          theme={theme}
-          title={shortcutMenu === 'location' ? 'Location shortcuts' : 'Job note shortcuts'}
-          options={shortcutMenu === 'location' ? locationShortcuts : ['M', 'F', 'abdo pain', 'Hb', 'WCC', 'CRP', 'eGFR']}
-          onSelect={(shortcut) => (shortcutMenu === 'location' ? applyLocationShortcut(shortcut) : applyTaskShortcut(shortcut))}
-          onClose={() => setShortcutMenu(null)}
-        />
-
+        <ShortcutMenu visible={shortcutMenu !== null} theme={theme} title={menuTitle} options={menuOptions} onSelect={(shortcut) => shortcutMenu === 'location' ? applyLocationShortcut(shortcut) : shortcutMenu === 'waitingFor' ? applyWaitingShortcut(shortcut) : applyTaskShortcut(shortcut)} onClose={() => setShortcutMenu(null)} />
       </KeyboardAvoidingView>
     </Modal>
   );
 }
 
-function HandoverScreen({ theme, handoverText, onCopy }: { theme: Theme; handoverText: string; onCopy: () => void }) {
+function HandoverScreen({ theme, handoverText, jobs, onCopy, onClearCompleted, onWipeAll }: { theme: Theme; handoverText: string; jobs: ClinicalJob[]; onCopy: () => void; onClearCompleted: () => void; onWipeAll: () => void }) {
+  const active = jobs.filter((job) => job.status !== 'done');
+  const completed = jobs.filter((job) => job.status === 'done');
   return (
     <ScrollView style={styles.body} contentContainerStyle={styles.handoverContent}>
-      <Text style={[styles.sectionTitle, { color: theme.text }]}>Handover review</Text>
-      <Text style={[styles.helpText, { color: theme.muted }]}>Plain text summary for quick review. This is not a formal handover record.</Text>
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>End-of-shift review</Text>
+      <Text style={[styles.helpText, { color: theme.muted }]}>Review active versus completed local scratchpad jobs before clearing. This is not a formal handover record.</Text>
+      <View style={[styles.settingsCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
+        <Text style={[styles.sectionSubtitle, { color: theme.text }]}>Still active ({active.length})</Text>
+        {active.length ? active.map((job) => <Text key={job.id} style={[styles.reviewLine, { color: theme.text }]}>• {job.taskText}{job.waitingFor ? ` — waiting for ${job.waitingFor}` : ''}</Text>) : <Text style={[styles.helpText, { color: theme.muted }]}>No active jobs.</Text>}
+      </View>
+      <View style={[styles.settingsCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
+        <Text style={[styles.sectionSubtitle, { color: theme.text }]}>Completed ({completed.length})</Text>
+        {completed.length ? completed.map((job) => <Text key={job.id} style={[styles.reviewLine, { color: theme.text }]}>• {job.taskText}</Text>) : <Text style={[styles.helpText, { color: theme.muted }]}>No completed jobs.</Text>}
+      </View>
       <View style={[styles.handoverBox, { backgroundColor: theme.card, borderColor: theme.border }]}> 
         <Text selectable style={[styles.handoverText, { color: theme.text }]}>{handoverText}</Text>
       </View>
       <TouchableOpacity style={styles.primaryButtonLarge} onPress={onCopy}>
-        <Text style={styles.primaryButtonText}>Copy to clipboard</Text>
+        <Text style={styles.primaryButtonText}>Copy plain text summary</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={[styles.clearDoneButton, { borderColor: theme.border, backgroundColor: theme.secondaryActionBackground, marginTop: 12 }]} onPress={onClearCompleted}>
+        <Text style={{ color: theme.secondaryActionText, fontWeight: '900' }}>Clear completed</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.dangerButton} onPress={onWipeAll}>
+        <Text style={styles.dangerButtonText}>Wipe all local jobs</Text>
       </TouchableOpacity>
       <Text style={[styles.warningText, { color: theme.warning }]}>Clipboard warning: copied patient-identifiable information may be exposed outside this app.</Text>
     </ScrollView>
@@ -540,7 +792,7 @@ function HandoverScreen({ theme, handoverText, onCopy }: { theme: Theme; handove
 }
 
 function ShortcutMenu({ visible, theme, title, options, onSelect, onClose }: { visible: boolean; theme: Theme; title: string; options: string[]; onSelect: (shortcut: string) => void; onClose: () => void }) {
-  const cleanOptions = options.filter(Boolean).slice(0, 8);
+  const cleanOptions = options.filter(Boolean).slice(0, MAX_RADIAL_NOTE_SHORTCUTS);
   const radius = cleanOptions.length <= 4 ? 82 : 108;
   const center = 136;
   const buttonWidth = 82;
@@ -579,10 +831,10 @@ function ShortcutMenu({ visible, theme, title, options, onSelect, onClose }: { v
   );
 }
 
-function UndoBar({ theme, message, onUndo, onDismiss }: { theme: Theme; message: string; onUndo: () => void; onDismiss: () => void }) {
+function UndoBar({ theme, message, count, onUndo, onDismiss }: { theme: Theme; message: string; count: number; onUndo: () => void; onDismiss: () => void }) {
   return (
     <View style={[styles.undoBar, { backgroundColor: theme.undoBackground, borderColor: theme.border }]}> 
-      <Text style={[styles.undoText, { color: theme.text }]} numberOfLines={1}>{message}</Text>
+      <Text style={[styles.undoText, { color: theme.text }]} numberOfLines={1}>{message}{count > 1 ? ` · ${count} undo steps` : ''}</Text>
       <TouchableOpacity accessibilityRole="button" style={styles.undoButton} onPress={onUndo}>
         <Text style={styles.undoButtonText}>Undo</Text>
       </TouchableOpacity>
@@ -593,16 +845,32 @@ function UndoBar({ theme, message, onUndo, onDismiss }: { theme: Theme; message:
   );
 }
 
-function SettingsScreen({ theme, settings, onSaveHours, onSaveLocationShortcuts, onWipeAll }: { theme: Theme; settings: AppSettings; onSaveHours: (value: string) => void; onSaveLocationShortcuts: (value: string) => void; onWipeAll: () => void }) {
+function SettingsScreen({ theme, settings, onSaveHours, onSaveLocationShortcuts, onSaveNoteShortcuts, onSaveStatusPhraseShortcuts, onSaveCompactMode, onSaveAppearanceMode, onSaveHapticsEnabled, onWipeAll }: { theme: Theme; settings: AppSettings; onSaveHours: (value: string) => void; onSaveLocationShortcuts: (value: string) => void; onSaveNoteShortcuts: (value: string) => void; onSaveStatusPhraseShortcuts: (value: string) => void; onSaveCompactMode: (compactMode: boolean) => void; onSaveAppearanceMode: (appearanceMode: AppearanceMode) => void; onSaveHapticsEnabled: (enabled: boolean) => void; onWipeAll: () => void }) {
   const [hoursText, setHoursText] = useState(String(settings.autoDeleteHours));
   const [locationShortcutsText, setLocationShortcutsText] = useState(settings.locationShortcuts.join(', '));
+  const [noteShortcutsText, setNoteShortcutsText] = useState(settings.noteShortcuts.join(', '));
+  const [statusPhraseText, setStatusPhraseText] = useState(settings.statusPhraseShortcuts.join(', '));
 
   useEffect(() => setHoursText(String(settings.autoDeleteHours)), [settings.autoDeleteHours]);
   useEffect(() => setLocationShortcutsText(settings.locationShortcuts.join(', ')), [settings.locationShortcuts]);
+  useEffect(() => setNoteShortcutsText(settings.noteShortcuts.join(', ')), [settings.noteShortcuts]);
+  useEffect(() => setStatusPhraseText(settings.statusPhraseShortcuts.join(', ')), [settings.statusPhraseShortcuts]);
 
   return (
     <ScrollView style={styles.body} contentContainerStyle={styles.settingsContent}>
       <Text style={[styles.sectionTitle, { color: theme.text }]}>Settings and privacy</Text>
+
+      <View style={[styles.settingsCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
+        <Text style={[styles.label, { color: theme.text }]}>Appearance</Text>
+        <Text style={[styles.helpText, { color: theme.muted }]}>Choose system, light, or dark. Dark mode is useful on-call and does not change stored data.</Text>
+        <View style={styles.segmentedRow}>
+          {APPEARANCE_MODES.map((mode) => (
+            <TouchableOpacity key={mode} style={[styles.segment, { borderColor: theme.border }, settings.appearanceMode === mode && styles.typeChipActive]} onPress={() => onSaveAppearanceMode(mode)}>
+              <Text style={{ color: settings.appearanceMode === mode ? '#ffffff' : theme.text, fontWeight: '900' }}>{appearanceLabels[mode]}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
 
       <View style={[styles.settingsCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
         <Text style={[styles.label, { color: theme.text }]}>Auto-delete interval in hours</Text>
@@ -617,6 +885,30 @@ function SettingsScreen({ theme, settings, onSaveHours, onSaveLocationShortcuts,
       </View>
 
       <View style={[styles.settingsCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
+        <View style={styles.settingsRowBetween}>
+          <View style={styles.settingsRowText}>
+            <Text style={[styles.label, { color: theme.text }]}>Compact card mode</Text>
+            <Text style={[styles.helpText, { color: theme.muted }]}>Denser job cards for real shifts with longer active lists. Keeps touch targets; hides nothing critical.</Text>
+          </View>
+          <TouchableOpacity style={[styles.toggleButton, { borderColor: theme.border }, settings.compactMode && styles.toggleButtonActive]} onPress={() => onSaveCompactMode(!settings.compactMode)}>
+            <Text style={{ color: settings.compactMode ? '#ffffff' : theme.text, fontWeight: '900' }}>{settings.compactMode ? 'On' : 'Off'}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={[styles.settingsCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
+        <View style={styles.settingsRowBetween}>
+          <View style={styles.settingsRowText}>
+            <Text style={[styles.label, { color: theme.text }]}>Haptic feedback</Text>
+            <Text style={[styles.helpText, { color: theme.muted }]}>Light tactile confirmation for add, bump, chase, status, undo. Best-effort only; not a safety alert.</Text>
+          </View>
+          <TouchableOpacity style={[styles.toggleButton, { borderColor: theme.border }, settings.hapticsEnabled && styles.toggleButtonActive]} onPress={() => onSaveHapticsEnabled(!settings.hapticsEnabled)}>
+            <Text style={{ color: settings.hapticsEnabled ? '#ffffff' : theme.text, fontWeight: '900' }}>{settings.hapticsEnabled ? 'On' : 'Off'}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={[styles.settingsCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
         <Text style={[styles.label, { color: theme.text }]}>Location shortcuts</Text>
         <TextInput
           value={locationShortcutsText}
@@ -627,6 +919,34 @@ function SettingsScreen({ theme, settings, onSaveHours, onSaveLocationShortcuts,
           style={[styles.input, { color: theme.text, backgroundColor: theme.background, borderColor: theme.border }]}
         />
         <Text style={[styles.helpText, { color: theme.muted }]}>Comma-separated local shortcuts shown when long-pressing the location field. Keep them ward/area labels only.</Text>
+      </View>
+
+      <View style={[styles.settingsCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
+        <Text style={[styles.label, { color: theme.text }]}>Job note shortcuts</Text>
+        <TextInput
+          value={noteShortcutsText}
+          onChangeText={setNoteShortcutsText}
+          onBlur={() => onSaveNoteShortcuts(noteShortcutsText)}
+          placeholder="M, F, Hb, WCC, CRP, Na, K, Cr"
+          placeholderTextColor={theme.placeholder}
+          multiline
+          style={[styles.input, styles.multiLineInput, { color: theme.text, backgroundColor: theme.background, borderColor: theme.border }]}
+        />
+        <Text style={[styles.helpText, { color: theme.muted }]}>Comma- or line-separated plain text snippets. The first 8 are radial favourites shown on long-press; keep extras lower in the list as a library/candidates. No interpretation or clinical logic.</Text>
+      </View>
+
+      <View style={[styles.settingsCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
+        <Text style={[styles.label, { color: theme.text }]}>Waiting/status phrase shortcuts</Text>
+        <TextInput
+          value={statusPhraseText}
+          onChangeText={setStatusPhraseText}
+          onBlur={() => onSaveStatusPhraseShortcuts(statusPhraseText)}
+          placeholder="awaiting bloods, awaiting CT, reg aware"
+          placeholderTextColor={theme.placeholder}
+          multiline
+          style={[styles.input, styles.multiLineInput, { color: theme.text, backgroundColor: theme.background, borderColor: theme.border }]}
+        />
+        <Text style={[styles.helpText, { color: theme.muted }]}>Plain local status phrases for the Waiting for field. They insert text only; they are not reminders, escalation rules, or advice.</Text>
       </View>
 
       <View style={[styles.settingsCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
@@ -670,6 +990,8 @@ const darkTheme = {
   placeholder: '#6b7280',
   warning: '#fbbf24',
   undoBackground: '#111827',
+  secondaryActionBackground: '#1f2937',
+  secondaryActionText: '#f9fafb',
 };
 
 const lightTheme = {
@@ -681,6 +1003,8 @@ const lightTheme = {
   placeholder: '#9ca3af',
   warning: '#92400e',
   undoBackground: '#ffffff',
+  secondaryActionBackground: '#e2e8f0',
+  secondaryActionText: '#0f172a',
 };
 
 const styles = StyleSheet.create({
@@ -706,22 +1030,31 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 22, fontWeight: '900' },
   emptyText: { marginTop: 6, fontSize: 15 },
   card: { borderWidth: 1, borderRadius: 14, padding: 10, marginBottom: 8 },
+  compactCard: { padding: 7, marginBottom: 6 },
+  pinnedCard: { borderLeftWidth: 5, borderLeftColor: '#f59e0b' },
   doneCard: { opacity: 0.72 },
   cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, flex: 1 },
   badge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   badgeText: { fontWeight: '900', fontSize: 10, textTransform: 'uppercase' },
-  cardActions: { flexDirection: 'row', gap: 4 },
+  cardActions: { flexDirection: 'row', gap: 4, alignItems: 'center' },
   actionButton: { paddingVertical: 6, paddingHorizontal: 6, minHeight: 34, justifyContent: 'center' },
+  iconActionButton: { paddingVertical: 5, paddingHorizontal: 7, minHeight: 34, minWidth: 34, justifyContent: 'center', alignItems: 'center' },
   taskText: { fontSize: 16, fontWeight: '800', lineHeight: 21, marginTop: 8 },
+  compactTaskText: { fontSize: 14, lineHeight: 18, marginTop: 5 },
   doneText: { textDecorationLine: 'line-through' },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 },
   metaText: { fontSize: 12, fontWeight: '700' },
   statusRow: { flexDirection: 'row', gap: 5, marginTop: 8 },
   statusButton: { flex: 1, borderWidth: 1, borderRadius: 8, minHeight: 34, alignItems: 'center', justifyContent: 'center' },
-  bottomActionRow: { position: 'absolute', left: 12, right: 12, bottom: 12, flexDirection: 'row', gap: 8 },
+  compactStatusButton: { minHeight: 30 },
+  cardUtilityRow: { flexDirection: 'row', gap: 6, marginTop: 7 },
+  utilityButton: { flex: 1, borderWidth: 1, borderRadius: 8, minHeight: 32, alignItems: 'center', justifyContent: 'center' },
+  bottomActionColumn: { position: 'absolute', left: 12, right: 12, bottom: 12, gap: 8 },
+  bottomActionRow: { flexDirection: 'row', gap: 8 },
+  sameLocationButton: { borderWidth: 1, borderRadius: 14, padding: 11, alignItems: 'center', minHeight: 44, justifyContent: 'center' },
   bottomAddButton: { flex: 1, backgroundColor: '#2563eb', borderRadius: 14, padding: 14, alignItems: 'center', minHeight: 52, justifyContent: 'center' },
-  clearDoneButton: { flex: 1, borderWidth: 1, borderRadius: 14, padding: 14, alignItems: 'center', backgroundColor: 'rgba(31,41,55,0.92)', minHeight: 52, justifyContent: 'center' },
+  clearDoneButton: { flex: 1, borderWidth: 1, borderRadius: 14, padding: 14, alignItems: 'center', minHeight: 52, justifyContent: 'center' },
   modalSafe: { flex: 1 },
   modalHeader: { height: 60, borderBottomWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12 },
   modalHeaderButton: { minWidth: 78, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
@@ -748,7 +1081,11 @@ const styles = StyleSheet.create({
   helpText: { fontSize: 14, lineHeight: 20 },
   mainInput: { minHeight: 112, maxHeight: 180, borderWidth: 1, borderRadius: 16, padding: 12, fontSize: 18, lineHeight: 24 },
   input: { borderWidth: 1, borderRadius: 14, padding: 13, minHeight: 48, fontSize: 16 },
+  multiLineInput: { minHeight: 82, textAlignVertical: 'top' },
   segmentedRow: { flexDirection: 'row', gap: 8 },
+  typeChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  typeChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 8, minHeight: 38 },
+  typeChipActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
   segment: { flex: 1, borderWidth: 1, borderRadius: 14, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   handoverContent: { paddingVertical: 16, paddingBottom: 42 },
   sectionTitle: { fontSize: 22, fontWeight: '900', marginBottom: 8 },
@@ -762,8 +1099,18 @@ const styles = StyleSheet.create({
   undoDismiss: { minWidth: 34, minHeight: 36, alignItems: 'center', justifyContent: 'center' },
   undoDismissText: { fontSize: 24, fontWeight: '700' },
   warningText: { fontSize: 13, lineHeight: 18, marginTop: 12, fontWeight: '700' },
+  waitingText: { fontSize: 13, fontWeight: '800', marginTop: 5 },
+  reviewLine: { fontSize: 14, lineHeight: 21, marginTop: 4, fontWeight: '700' },
+  shiftCard: { borderWidth: 1, borderRadius: 14, padding: 10, marginTop: 8 },
+  horizontalControls: { flexGrow: 0 },
+  horizontalControlContent: { gap: 6, paddingVertical: 7, paddingRight: 18 },
+  groupHeader: { fontSize: 15, fontWeight: '900', paddingVertical: 8, borderBottomWidth: 1, marginBottom: 6 },
   settingsContent: { paddingVertical: 16, paddingBottom: 42 },
   settingsCard: { borderWidth: 1, borderRadius: 16, padding: 14, marginTop: 12 },
+  settingsRowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  settingsRowText: { flex: 1 },
+  toggleButton: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 16, minHeight: 42, alignItems: 'center', justifyContent: 'center' },
+  toggleButtonActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
   dangerButton: { backgroundColor: '#991b1b', padding: 16, borderRadius: 14, alignItems: 'center', marginTop: 18, minHeight: 52, justifyContent: 'center' },
   dangerButtonText: { color: '#fee2e2', fontWeight: '900', fontSize: 16 },
 });

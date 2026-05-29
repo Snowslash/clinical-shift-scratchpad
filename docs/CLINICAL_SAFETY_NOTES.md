@@ -24,6 +24,7 @@ A low-friction local organiser for unofficial temporary shift jobs, similar in r
 
 - no clinical recommendations
 - no prioritisation beyond user-selected urgency labels
+- pin/star, job type, bump, duplicate, and waiting-duration display are local workflow aids only, not clinical triage or escalation logic
 - no AI summaries or triage
 - no hidden automation
 - auto-expiry to reduce stale data
@@ -33,10 +34,15 @@ A low-friction local organiser for unofficial temporary shift jobs, similar in r
 
 ## Main residual risks
 
-The app can still contribute to harm if users enter the wrong patient, forget to update a job, over-rely on it instead of formal systems, lose their phone, or expose copied identifiers via clipboard.
+The app can still contribute to harm if users enter the wrong patient, forget to update a job, misread local workflow labels as clinical priority, over-rely on it instead of formal systems, lose their phone, or expose copied identifiers via clipboard.
 
 See `docs/HAZARD_LOG.md` for the first hazard log.
 
 ## Before any real-world deployment
 
 A real deployment would require proper clinical safety, information governance, data protection, usability, security, and organisational approval work. That is deliberately not claimed here.
+
+
+### Added workflow aids boundary
+
+Shift mode, end-of-shift review, Waiting for, Chase, sort/group controls, undo history, and haptics are implemented as local ergonomics only. They must not be described as clinical safety controls, escalation prompts, reminders, audit logs, or formal handover evidence. Waiting/chase text is plain user-entered text; the app does not infer urgency or advise action.

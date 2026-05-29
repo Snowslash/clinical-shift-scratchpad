@@ -1,4 +1,4 @@
-import { AppSettings, ClinicalJob, DEFAULT_AUTO_DELETE_HOURS, DEFAULT_LOCATION_SHORTCUTS, JobDraft, JobStatus } from '../types/job';
+import { AppSettings, ClinicalJob, DEFAULT_APPEARANCE_MODE, DEFAULT_AUTO_DELETE_HOURS, DEFAULT_COMPACT_MODE, DEFAULT_LOCATION_SHORTCUTS, DEFAULT_NOTE_SHORTCUTS, DEFAULT_STATUS_PHRASE_SHORTCUTS, MAX_NOTE_SHORTCUTS, MAX_STATUS_PHRASE_SHORTCUTS, JobDraft, JobStatus } from '../types/job';
 import { encryptedStorageDriver, StorageDriver } from './storage';
 
 const JOBS_KEY = 'clinical-shift-scratchpad/jobs/v1';
@@ -15,20 +15,28 @@ const safeJsonParse = <T>(raw: string | null, fallback: T): T => {
   }
 };
 
-const normaliseShortcutList = (value: unknown): string[] => {
-  const source = Array.isArray(value) ? value : DEFAULT_LOCATION_SHORTCUTS;
+const normaliseShortcutList = (value: unknown, fallback: string[], limit = 12): string[] => {
+  const source = Array.isArray(value) ? value : fallback;
   const cleaned = source
     .map((item) => String(item).trim())
     .filter(Boolean);
   const unique = Array.from(new Set(cleaned));
-  return unique.length > 0 ? unique.slice(0, 12) : DEFAULT_LOCATION_SHORTCUTS;
+  return unique.length > 0 ? unique.slice(0, limit) : fallback.slice(0, limit);
 };
+
+const isValidIso = (value: unknown): value is string => typeof value === 'string' && Number.isFinite(new Date(value).getTime());
 
 const normaliseSettings = (settings: Partial<AppSettings> | null | undefined): AppSettings => {
   const candidate = Number(settings?.autoDeleteHours);
   return {
     autoDeleteHours: Number.isFinite(candidate) && candidate > 0 ? Math.min(candidate, 168) : DEFAULT_AUTO_DELETE_HOURS,
-    locationShortcuts: normaliseShortcutList(settings?.locationShortcuts),
+    locationShortcuts: normaliseShortcutList(settings?.locationShortcuts, DEFAULT_LOCATION_SHORTCUTS),
+    noteShortcuts: normaliseShortcutList(settings?.noteShortcuts, DEFAULT_NOTE_SHORTCUTS, MAX_NOTE_SHORTCUTS),
+    compactMode: typeof settings?.compactMode === 'boolean' ? settings.compactMode : DEFAULT_COMPACT_MODE,
+    appearanceMode: settings?.appearanceMode === 'light' || settings?.appearanceMode === 'dark' || settings?.appearanceMode === 'system' ? settings.appearanceMode : DEFAULT_APPEARANCE_MODE,
+    currentShiftStartedAt: isValidIso(settings?.currentShiftStartedAt) ? settings.currentShiftStartedAt : undefined,
+    statusPhraseShortcuts: normaliseShortcutList(settings?.statusPhraseShortcuts, DEFAULT_STATUS_PHRASE_SHORTCUTS, MAX_STATUS_PHRASE_SHORTCUTS),
+    hapticsEnabled: typeof settings?.hapticsEnabled === 'boolean' ? settings.hapticsEnabled : true,
   };
 };
 
@@ -50,6 +58,9 @@ export const createJob = (draft: JobDraft, autoDeleteHours = DEFAULT_AUTO_DELETE
     location: draft.location?.trim() || undefined,
     taskText: draft.taskText.trim(),
     urgency: draft.urgency,
+    jobType: draft.jobType,
+    pinned: false,
+    waitingFor: draft.waitingFor?.trim() || undefined,
     status: 'pending',
     createdAt,
     updatedAt: createdAt,
@@ -112,6 +123,53 @@ export class JobStore {
 
   async setStatus(id: string, status: JobStatus): Promise<ClinicalJob[]> {
     return this.updateJob(id, { status });
+  }
+
+  async togglePinned(id: string): Promise<ClinicalJob[]> {
+    const jobs = await this.getJobs();
+    const updatedAt = new Date(this.nowMs()).toISOString();
+    const next = jobs.map((job) => (job.id === id ? { ...job, pinned: !job.pinned, updatedAt } : job));
+    await this.saveJobs(next);
+    return next;
+  }
+
+  async bumpJob(id: string): Promise<ClinicalJob[]> {
+    return this.updateJob(id, {});
+  }
+
+  async chaseJob(id: string): Promise<ClinicalJob[]> {
+    const jobs = await this.getJobs();
+    const updatedAt = new Date(this.nowMs()).toISOString();
+    const next = jobs.map((job) => (job.id === id ? { ...job, updatedAt, lastChasedAt: updatedAt, chaseCount: (job.chaseCount ?? 0) + 1 } : job));
+    await this.saveJobs(next);
+    return next;
+  }
+
+  async startShift(): Promise<AppSettings> {
+    const settings = await this.getSettings();
+    return this.saveSettings({ ...settings, currentShiftStartedAt: new Date(this.nowMs()).toISOString() });
+  }
+
+  async endShift(): Promise<AppSettings> {
+    const settings = await this.getSettings();
+    return this.saveSettings({ ...settings, currentShiftStartedAt: undefined });
+  }
+
+  async duplicateJob(id: string): Promise<ClinicalJob[]> {
+    const [settings, jobs] = await Promise.all([this.getSettings(), this.getJobs()]);
+    const source = jobs.find((job) => job.id === id);
+    if (!source) return jobs;
+    const duplicate = createJob({
+      taskText: source.taskText,
+      patientIdentifier: source.patientIdentifier,
+      location: source.location,
+      urgency: source.urgency,
+      jobType: source.jobType,
+      waitingFor: source.waitingFor,
+    }, settings.autoDeleteHours, new Date(this.nowMs()));
+    const next = [duplicate, ...jobs];
+    await this.saveJobs(next);
+    return next;
   }
 
   async setStatusWithUndo(id: string, status: JobStatus): Promise<UndoableJobChange> {

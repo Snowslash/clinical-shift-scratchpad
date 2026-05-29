@@ -56,3 +56,8 @@ Local-only does not mean risk-free. Remaining risks include:
 ## Honest limitation
 
 Do not describe this as storing nothing. It stores data locally until deletion or expiry. Correct wording: local-only, temporary, auto-expiring storage.
+
+
+### Workflow metadata
+
+The app now stores additional local metadata such as shift start time, Waiting for text, last chased time/count, status phrase shortcuts, haptics preference, and sort/group UI state. This data remains local-only in the same app storage boundary. It is not synced, not sent to a server, and not a formal clinical record or audit trail.

@@ -11,12 +11,27 @@ It is intended as a structured scratchpad: faster and clearer than Apple Notes, 
 Works as a local mobile prototype with:
 
 - fast free-text-first job creation
-- text-entry shortcuts via gesture-handler radial menus on long-press for job note/location fields, including `M`/`F` note prefixes
+- editable text-entry shortcuts via gesture-handler radial menus on long-press for job note/location fields, including `M`/`F` note prefixes and common investigation abbreviations
 - editable local location shortcuts, defaulting to `TCI`
+- editable local job-note shortcut library in Settings; the first 8 are radial favourites to keep the one-handed wheel tappable
 - optional minimum-necessary patient identifier
-- optional ward/area/bed location
+- optional ward/area/bed location, with a same-location fast-add action from the most recent job
+- optional plain job type tags: review / bloods / imaging / call / family / discharge / prescribing / handover
 - urgency: routine / soon / urgent
 - status: pending / seen / waiting / done
+- pin/star jobs for personal attention without implying clinical priority
+- last-touched or waiting-duration text on each card
+- bump-to-top and duplicate-job actions for repeated ward tasks
+- optional compact card mode for dense active lists
+- manual appearance setting: system / light / dark mode
+- local shift timer plus end-of-shift review screen for active versus completed jobs
+- quick-capture Add + keep open flow for receiving several jobs in a row
+- non-clinical sort presets: pinned first / waiting longest / recently touched / by location / by status / by tag
+- optional location grouping
+- optional Waiting for field plus editable status phrase shortcuts
+- one-tap Chase action that updates local chase metadata and last-touched time
+- small undo stack for recent destructive/status actions; this is not an audit trail
+- optional haptic feedback for key interactions
 - local persistence after app restart
 - local auto-expiry, default 24 hours
 - clear completed jobs with brief undo
@@ -89,10 +104,10 @@ npm run web
 ## Main files
 
 - `App.tsx` — single-screen-app prototype UI and interactions
-- `src/types/job.ts` — job, urgency, status, and settings types
+- `src/types/job.ts` — job, urgency, status, tag, pin, waiting-for, shift, appearance, haptics, and settings types
 - `src/services/storage.ts` — replaceable storage abstraction
-- `src/services/jobStore.ts` — local job persistence, expiry, settings, wipe-all, and restorable undo snapshots
-- `src/utils/jobSorting.ts` — urgency/status/age sorting and filters
+- `src/services/jobStore.ts` — local job persistence, expiry, settings, shift timer, chase metadata, wipe-all, and restorable undo snapshots
+- `src/utils/jobSorting.ts` — non-clinical sort presets, location grouping, and filters
 - `src/utils/textShortcuts.ts` — plain-text shortcut insertion helpers
 - `src/utils/handover.ts` — handover text generation retained but not currently exposed in main navigation
 - `docs/` — product, data handling, clinical safety, and hazard notes
@@ -103,7 +118,7 @@ npm run web
 - SecureStore availability and security properties depend on the device platform and OS configuration.
 - No formal clinical safety case.
 - No regulatory/GDPR assurance.
-- No audit trail.
+- No audit trail; pinning, bumping, chase, waiting-for text, shift timer, haptics, sort/group controls, and job types are local workflow aids only.
 - No authentication or device-level access control beyond the user's device settings.
 - Clipboard use may leak patient-identifiable data to other apps/services if the hidden handover/copy feature is re-exposed.
 - Phone loss, screenshots, OS backups, and shoulder-surfing remain risks.
