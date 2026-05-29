@@ -35,7 +35,7 @@
     persistTheme(normalisedTheme);
   }
 
-  setTheme(getStoredTheme() || root.dataset.theme || "light");
+  setTheme(getStoredTheme() || root.dataset.theme || "dark");
 
   if (toggle) {
     toggle.addEventListener("click", function () {
