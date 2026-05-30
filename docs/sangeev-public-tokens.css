@@ -1,0 +1,35 @@
+/* Canonical public-estate tokens for sangeev.me and small clinical project pages.
+   Keep this file byte-identical across sangeev.me, opnotes.sangeev.me and scratchpad.sangeev.me.
+   Run scripts/audit-public-tokens.py from the sangeev-me repo before claiming visual standardisation. */
+:root {
+  color-scheme: light;
+  --bg: #f7f6f2;
+  --panel: #fffefa;
+  --text: #1f2328;
+  --text-strong: #1f2328;
+  --text-muted: #5c6570;
+  --border: #c9c3b7;
+  --border-strong: #9f927d;
+  --accent: #184f6a;
+  --accent-hover: #113b50;
+  --warning-bg: #fff4d8;
+  --warning-border: #d7b86d;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-serif: ui-serif, Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #151512;
+  --panel: #1d1c18;
+  --text: #ebe7dc;
+  --text-strong: #ebe7dc;
+  --text-muted: #b4ab9b;
+  --border: #4a4438;
+  --border-strong: #746a5b;
+  --accent: #9fc7d7;
+  --accent-hover: #c0deea;
+  --warning-bg: #2e2208;
+  --warning-border: #7c5d19;
+}
