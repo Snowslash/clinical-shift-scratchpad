@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Clinical Shift Scratchpad is a local mobile prototype for tracking temporary ward jobs during a shift."
+      content="Clinical Shift Scratchpad is a local mobile prototype for keeping temporary ward jobs in one place during a shift."
     />
     <title>Clinical Shift Scratchpad — Sangeev</title>
-    <link rel="stylesheet" href="./styles.css?v=20260529-font1" />
+    <link rel="stylesheet" href="./styles.css?v=20260530-plain1" />
     <script src="./theme.js?v=20260529-font1" defer></script>
   </head>
   <body>
@@ -19,9 +19,9 @@
           <a href="https://opnotes.sangeev.me">Op notes</a>
           <a href="https://scratchpad.sangeev.me" aria-current="page">Scratchpad</a>
         </nav>
-      <button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch to light mode" aria-pressed="true">
-        <span aria-hidden="true">☀</span><span>Light</span>
-      </button>
+        <button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch to light mode" aria-pressed="true">
+          <span aria-hidden="true">☀</span><span>Light</span>
+        </button>
       </div>
     </header>
 
@@ -29,58 +29,48 @@
       <section class="hero" aria-labelledby="page-title">
         <h1 id="page-title">Clinical Shift Scratchpad</h1>
         <p class="lede">
-          A field-tested mobile scratchpad for capturing active ward jobs quickly during
-          on-call shifts, without relying on scraps of paper, screenshots or memory.
+          I made this because ward jobs kept ending up split between paper, screenshots and memory during busy shifts.
+        </p>
+        <p>
+          It is a mobile-first scratchpad for temporary task organisation: quick free text, optional minimum-necessary patient identifier, location, urgency, status, pins, duplication and local expiry.
+        </p>
+        <p>
+          It is not a medical record and not decision support.
         </p>
         <div class="actions" aria-label="Project links">
-          <a class="button primary" href="https://github.com/Snowslash/clinical-shift-scratchpad">View source</a>
+          <a class="button" href="https://github.com/Snowslash/clinical-shift-scratchpad">Source on GitHub</a>
         </div>
       </section>
 
-      <section class="grid" aria-label="Project summary">
-        <article class="card">
-          <h2>What it is</h2>
-          <p>
-            A scratchpad for active jobs: quick free-text entry, optional minimum-necessary patient identifier,
-            location, tags, urgency, status, pinning, duplication and local expiry.
-          </p>
-        </article>
-        <article class="card">
-          <h2>Why it exists</h2>
-          <p>
-            Ward jobs often end up scattered. This keeps the temporary list quicker to capture,
-            easier to scan and less likely to drift during a shift.
-          </p>
-        </article>
-        <article class="card">
-          <h2>Current status</h2>
-          <p>
-            Prototype, field-tested personally and narrow on purpose. Useful enough to keep using;
-            not production software and not a clinical system.
-          </p>
-        </article>
+      <section id="safety" class="notice" aria-labelledby="safety-heading">
+        <h2 id="safety-heading">Safety and privacy notes</h2>
+        <p><strong>Do not enter patient-identifiable information into this website or repository.</strong></p>
+        <p>
+          Runtime data should stay on the device. There is no backend, login, cloud sync, analytics, messaging, AI or EHR integration.
+        </p>
+        <p>
+          This is a personal prototype for temporary task organisation only. It should not be used as the source of truth for patient care.
+        </p>
       </section>
 
-      <section class="feature-section" aria-labelledby="features-heading">
-        <div>
-          <p class="eyebrow">Current prototype</p>
-          <h2 id="features-heading">Fast local capture for ward jobs</h2>
-        </div>
-        <ul class="feature-list">
-          <li>Start with free text, then add structured fields when useful.</li>
-          <li>Use radial menus for common note and location shortcuts.</li>
-          <li>Keep the first favourites wheel-sized for one-handed use.</li>
-          <li>Set status, urgency, job type, pins, bump-to-top and duplicate-job actions.</li>
-          <li>Compact card mode and local auto-expiry for dense active lists.</li>
-          <li>No backend, login, cloud sync, analytics, messaging, AI or EHR integration.</li>
+      <section class="section" aria-labelledby="what-heading">
+        <h2 id="what-heading">What it does</h2>
+        <p>
+          It keeps an active list of ward jobs easier to capture and scan during a shift. Start with free text, then add structure when it is useful.
+        </p>
+        <ul>
+          <li>radial menus for common note and location shortcuts;</li>
+          <li>status, urgency, job type, pinning and bump-to-top actions;</li>
+          <li>compact card mode for dense lists;</li>
+          <li>local auto-expiry for jobs that should not persist indefinitely.</li>
         </ul>
       </section>
 
       <section class="screenshots" aria-labelledby="screenshots-heading">
-        <div class="screenshots-heading">
-          <p class="eyebrow">Screenshots</p>
-          <h2 id="screenshots-heading">Mobile-first shift workflow</h2>
-        </div>
+        <h2 id="screenshots-heading">Screenshots</h2>
+        <p>
+          Synthetic examples. The screenshots show the current prototype shape, not a live clinical system.
+        </p>
         <div class="screenshot-grid">
           <figure>
             <img
@@ -105,24 +95,21 @@
         </div>
       </section>
 
-      <section id="safety" class="notice" aria-labelledby="safety-heading">
-        <h2 id="safety-heading">Not a medical record. Not decision support.</h2>
+      <section class="section status" aria-labelledby="limits-heading">
+        <h2 id="limits-heading">Limits</h2>
         <p>
-          This is a personal prototype for temporary task organisation only. It is not a referral app, EHR,
-          messaging system, NHS-approved product, clinical safety system, regulated medical device or GDPR-assured
-          service. It should not be used as the source of truth for patient care.
+          It is not a referral app, EHR, messaging system, NHS-approved product, clinical safety system, regulated medical device or GDPR-assured service.
         </p>
+        <h2>Status</h2>
         <p>
-          Runtime data should stay on the device. Do not send patient-identifiable data to this website or repository.
+          Personal prototype. Field-tested by me, narrow on purpose and not production software.
         </p>
       </section>
-
     </main>
 
     <footer>
       <p>
-        Clinical Shift Scratchpad is an experimental personal project by Sangeev. Check anything copied from it
-        before using a clinical system.
+        Maintained by <a href="https://sangeev.me">Sangeev</a>.
       </p>
     </footer>
   </body>
