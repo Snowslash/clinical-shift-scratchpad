@@ -220,8 +220,14 @@ p {
 .notice {
   border: 1px solid var(--warning-border);
   background: var(--warning-bg);
+  color: var(--text-strong);
   padding: 14px 16px;
   margin: 8px 0 0;
+}
+
+.notice p,
+.notice strong {
+  color: var(--text-strong);
 }
 
 .notice h2 {
