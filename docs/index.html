@@ -8,8 +8,8 @@
       content="Clinical Shift Scratchpad is a local mobile prototype for keeping temporary ward jobs in one place during a shift."
     />
     <title>Clinical Shift Scratchpad — Sangeev</title>
-    <link rel="stylesheet" href="./styles.css?v=20260530-nav5" />
-    <script src="./theme.js?v=20260530-nav5" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=20260530-density1" />
+    <script src="./theme.js?v=20260530-density1" defer></script>
   </head>
   <body>
     <header class="site-nav" aria-label="Site navigation">
@@ -26,32 +26,34 @@
     </header>
 
     <main>
-      <section class="hero" aria-labelledby="page-title">
-        <h1 id="page-title">Clinical Shift Scratchpad</h1>
-        <p class="lede">
-          I made this because ward jobs kept ending up split between paper, screenshots and memory during busy shifts.
-        </p>
-        <p>
-          It is a mobile-first scratchpad for temporary task organisation: quick free text, optional minimum-necessary patient identifier, location, urgency, status, pins, duplication and local expiry.
-        </p>
-        <p>
-          It is not a medical record and not decision support.
-        </p>
-        <div class="actions" aria-label="Project links">
-          <a class="button" href="https://github.com/Snowslash/clinical-shift-scratchpad">Source on GitHub</a>
-        </div>
-      </section>
+      <div class="intro-grid">
+        <section class="hero" aria-labelledby="page-title">
+          <h1 id="page-title">Clinical Shift Scratchpad</h1>
+          <p class="lede">
+            I made this because ward jobs kept ending up split between paper, screenshots and memory during busy shifts.
+          </p>
+          <p>
+            It is a mobile-first scratchpad for temporary task organisation: quick free text, optional minimum-necessary patient identifier, location, urgency, status, pins, duplication and local expiry.
+          </p>
+          <p>
+            It is not a medical record and not decision support.
+          </p>
+          <div class="actions" aria-label="Project links">
+            <a class="button" href="https://github.com/Snowslash/clinical-shift-scratchpad">Source on GitHub</a>
+          </div>
+        </section>
 
-      <section id="safety" class="notice" aria-labelledby="safety-heading">
-        <h2 id="safety-heading">Safety and privacy notes</h2>
-        <p><strong>Do not enter patient-identifiable information into this website or repository.</strong></p>
-        <p>
-          Runtime data should stay on the device. There is no backend, login, cloud sync, analytics, messaging, AI or EHR integration.
-        </p>
-        <p>
-          This is a personal prototype for temporary task organisation only. It should not be used as the source of truth for patient care.
-        </p>
-      </section>
+        <section id="safety" class="notice" aria-labelledby="safety-heading">
+          <h2 id="safety-heading">Safety and privacy notes</h2>
+          <p><strong>Do not enter patient-identifiable information into this website or repository.</strong></p>
+          <p>
+            Runtime data should stay on the device. There is no backend, login, cloud sync, analytics, messaging, AI or EHR integration.
+          </p>
+          <p>
+            This is a personal prototype for temporary task organisation only. It should not be used as the source of truth for patient care.
+          </p>
+        </section>
+      </div>
 
       <section class="section" aria-labelledby="what-heading">
         <h2 id="what-heading">What it does</h2>

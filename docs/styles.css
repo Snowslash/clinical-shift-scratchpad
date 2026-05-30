@@ -124,6 +124,10 @@ main {
   padding: 0 0 24px;
 }
 
+.intro-grid {
+  display: block;
+}
+
 .hero {
   padding: 0 0 6px;
 }
@@ -217,7 +221,7 @@ p {
   border: 1px solid var(--warning-border);
   background: var(--warning-bg);
   padding: 14px 16px;
-  margin: 18px 0 22px;
+  margin: 8px 0 0;
 }
 
 .notice h2 {
@@ -279,11 +283,24 @@ footer p {
 
 @media (max-width: 700px) {
   main {
-    padding-top: 30px;
+    padding-top: 0;
+  }
+
+  .notice {
+    margin-top: 12px;
   }
 
   .screenshot-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 860px) {
+  .intro-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 36%);
+    gap: 24px;
+    align-items: start;
   }
 }
 
