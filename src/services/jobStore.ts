@@ -103,7 +103,7 @@ export class JobStore {
 
   async addJob(draft: JobDraft): Promise<ClinicalJob[]> {
     const [settings, jobs] = await Promise.all([this.getSettings(), this.getJobs()]);
-    const next = [createJob(draft, settings.autoDeleteHours), ...jobs];
+    const next = [createJob(draft, settings.autoDeleteHours, new Date(this.nowMs())), ...jobs];
     await this.saveJobs(next);
     return next;
   }

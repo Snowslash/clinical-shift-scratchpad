@@ -135,6 +135,17 @@ describe('JobStore', () => {
     expect((await store.saveSettings({ autoDeleteHours: 24, appearanceMode: 'sepia' as never })).appearanceMode).toBe('system');
   });
 
+  it('uses the injected clock when adding jobs', async () => {
+    const storage = new MemoryStorage();
+    const store = new JobStore(storage, () => fixed.getTime());
+
+    const jobs = await store.addJob({ taskText: 'Review bloods', location: 'A7', urgency: 'soon', jobType: 'bloods' });
+
+    expect(jobs[0].createdAt).toBe('2026-05-25T12:00:00.000Z');
+    expect(jobs[0].updatedAt).toBe('2026-05-25T12:00:00.000Z');
+    expect(jobs[0].expiresAt).toBe('2026-05-26T12:00:00.000Z');
+  });
+
   it('creates, toggles, bumps, and duplicates lightweight workflow metadata', async () => {
     const storage = new MemoryStorage();
     let now = fixed.getTime();
