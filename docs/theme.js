@@ -1,17 +1,36 @@
 (function () {
   const STORAGE_KEY = "sangeevSiteTheme";
+  const COOKIE_NAME = STORAGE_KEY;
+  const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
   const root = document.documentElement;
   const toggle = document.querySelector("[data-theme-toggle]");
 
+  function normaliseTheme(theme) {
+    return theme === "dark" ? "dark" : theme === "light" ? "light" : null;
+  }
+
+  function getCookieTheme() {
+    const cookie = document.cookie
+      .split(";")
+      .map(function (part) { return part.trim(); })
+      .find(function (part) { return part.indexOf(COOKIE_NAME + "=") === 0; });
+
+    if (!cookie) {
+      return null;
+    }
+
+    return normaliseTheme(decodeURIComponent(cookie.slice(COOKIE_NAME.length + 1)));
+  }
+
   function getStoredTheme() {
     try {
-      return localStorage.getItem(STORAGE_KEY);
+      return normaliseTheme(localStorage.getItem(STORAGE_KEY));
     } catch (error) {
       return null;
     }
   }
 
-  function persistTheme(theme) {
+  function persistStoredTheme(theme) {
     try {
       localStorage.setItem(STORAGE_KEY, theme);
     } catch (error) {
@@ -19,8 +38,36 @@
     }
   }
 
+  function persistCookieTheme(theme) {
+    try {
+      const parts = [
+        COOKIE_NAME + "=" + encodeURIComponent(theme),
+        "Max-Age=" + COOKIE_MAX_AGE_SECONDS,
+        "Path=/",
+        "SameSite=Lax"
+      ];
+
+      if (window.location.hostname === "sangeev.me" || window.location.hostname.endsWith(".sangeev.me")) {
+        parts.push("Domain=.sangeev.me");
+      }
+
+      if (window.location.protocol === "https:") {
+        parts.push("Secure");
+      }
+
+      document.cookie = parts.join("; ");
+    } catch (error) {
+      // Cookies can be blocked; localStorage fallback still covers this origin.
+    }
+  }
+
+  function persistTheme(theme) {
+    persistStoredTheme(theme);
+    persistCookieTheme(theme);
+  }
+
   function setTheme(theme) {
-    const normalisedTheme = theme === "dark" ? "dark" : "light";
+    const normalisedTheme = normaliseTheme(theme) || "light";
     const isDark = normalisedTheme === "dark";
     root.dataset.theme = normalisedTheme;
 
@@ -35,7 +82,7 @@
     persistTheme(normalisedTheme);
   }
 
-  setTheme(getStoredTheme() || root.dataset.theme || "dark");
+  setTheme(getCookieTheme() || getStoredTheme() || root.dataset.theme || "dark");
 
   if (toggle) {
     toggle.addEventListener("click", function () {
