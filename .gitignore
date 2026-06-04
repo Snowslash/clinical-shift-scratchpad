@@ -37,6 +37,12 @@ yarn-error.*
 !.env.sample
 .env*.local
 
+# private/local documentation
+# Keep field-use notes and other personal operational notes out of the public repo.
+docs/FIELD_TEST_NOTES.md
+docs/private/
+docs/*.local.md
+
 # typescript
 *.tsbuildinfo
 
