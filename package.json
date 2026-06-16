@@ -17,7 +17,8 @@
   "devDependencies": {
     "@types/react": "~19.1.10",
     "typescript": "~5.9.2",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.7",
+    "wrangler": "^4.95.0"
   },
   "scripts": {
     "start": "node ./node_modules/expo/bin/cli start",
@@ -26,7 +27,9 @@
     "web": "node ./node_modules/expo/bin/cli start --web",
     "export:ios": "node ./node_modules/expo/bin/cli export --platform ios",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "deploy": "npx expo export -p web && wrangler deploy",
+    "preview": "npx expo export -p web && wrangler dev"
   },
   "private": true
 }
