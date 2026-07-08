@@ -8,7 +8,7 @@ export const darkTheme = {
   muted: '#c7b8a5',
   border: '#655e55',
   placeholder: '#8b7b68',
-  warning: '#c75b7a',
+  warning: '#a3264d',
   undoBackground: '#24211d',
   secondaryActionBackground: '#302b25',
   secondaryActionText: '#f4f0e8',
