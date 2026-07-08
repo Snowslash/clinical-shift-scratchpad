@@ -1,34 +1,68 @@
 :root {
   color-scheme: light;
-  --bg: #f7f6f2;
-  --panel: #fffefa;
-  --text: #1f2328;
-  --text-strong: #1f2328;
-  --text-muted: #5c6570;
-  --border: #c9c3b7;
-  --border-strong: #9f927d;
-  --accent: #184f6a;
-  --accent-hover: #113b50;
-  --warning-bg: #fff4d8;
-  --warning-border: #d7b86d;
-  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-serif: ui-serif, Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+  --bg: #f4f0e8;
+  --panel: #fbf8f2;
+  --panel-muted: #f3eadf;
+  --panel-soft: #eadfce;
+  --text: #1d1b18;
+  --text-strong: #1d1b18;
+  --text-muted: #655e55;
+  --text-subtle: #776d62;
+  --brand: #8a1538;
+  --brand-hover: #641028;
+  --accent: #8a1538;
+  --accent-hover: #641028;
+  --border: #c7b8a5;
+  --border-soft: #d8cbbb;
+  --border-strong: #9b8770;
+  --border-control: #9b8770;
+  --secondary: #eadfce;
+  --secondary-hover: #e0d1be;
+  --danger-bg: #f4dada;
+  --danger-hover: #edc2c2;
+  --danger-text: #8a1538;
+  --error-bg: #f8e4e4;
+  --error-border: #d8a3a3;
+  --error-text: #8a1538;
+  --warning-bg: #f8ead3;
+  --warning-border: #c7b8a5;
+  --warning-text: #65481c;
+  --font-display: ui-serif, Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+  --font-body: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+  --shadow: none;
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #151512;
-  --panel: #1d1c18;
-  --text: #ebe7dc;
-  --text-strong: #ebe7dc;
-  --text-muted: #b4ab9b;
-  --border: #4a4438;
-  --border-strong: #746a5b;
-  --accent: #9fc7d7;
-  --accent-hover: #c0deea;
-  --warning-bg: #2e2208;
-  --warning-border: #7c5d19;
+  --bg: #1d1b18;
+  --panel: #24211d;
+  --panel-muted: #211f1b;
+  --panel-soft: #2b2722;
+  --text: #f4f0e8;
+  --text-strong: #f4f0e8;
+  --text-muted: #c7b8a5;
+  --text-subtle: #aa9b87;
+  --brand: #c75b7a;
+  --brand-hover: #e18aa2;
+  --accent: #c75b7a;
+  --accent-hover: #e18aa2;
+  --border: #655e55;
+  --border-soft: #514941;
+  --border-strong: #8b7b68;
+  --border-control: #8b7b68;
+  --secondary: #302b25;
+  --secondary-hover: #3a342c;
+  --danger-bg: #3b151c;
+  --danger-hover: #521d28;
+  --danger-text: #ffd8df;
+  --error-bg: #3b151c;
+  --error-border: #783040;
+  --error-text: #ffd8df;
+  --warning-bg: #2d251b;
+  --warning-border: #655e55;
+  --warning-text: #f0d49a;
+  --shadow: none;
 }
 
 * { box-sizing: border-box; }
@@ -329,4 +363,79 @@ footer p {
     width: 100%;
     justify-content: flex-start;
   }
+}
+
+
+/* Open Design visual language rollout — 2026-07-08.
+   Warm project-note palette, display serif headings, thin rules and ordinary links. */
+body,
+button {
+  font-family: var(--font-body, var(--font-sans));
+}
+
+.site-nav,
+main,
+footer {
+  width: min(900px, calc(100% - 32px));
+}
+
+.site-nav {
+  margin-top: 0;
+  padding-top: 11px;
+  align-items: baseline;
+}
+
+.site-nav-brand,
+.site-nav-links a {
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+
+.theme-toggle {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display, var(--font-serif));
+  font-weight: 400;
+  letter-spacing: -0.018em;
+}
+
+h1,
+.lede,
+.project-item h3 {
+  color: var(--text-strong);
+}
+
+h2 {
+  font-size: clamp(22px, 3vw, 30px);
+}
+
+.section,
+.project-list,
+.project-item,
+footer {
+  border-color: var(--border);
+}
+
+.project-link {
+  color: var(--accent);
+  text-underline-offset: 4px;
+}
+
+@media (min-width: 860px) {
+  .intro-grid {
+    grid-template-columns: minmax(260px, 340px) minmax(300px, 520px);
+    gap: clamp(36px, 7vw, 84px);
+  }
+}
+
+/* User feedback polish — 2026-07-08. */
+.hero h1 {
+  color: var(--accent);
 }

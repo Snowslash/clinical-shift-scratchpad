@@ -82,7 +82,7 @@
     persistTheme(normalisedTheme);
   }
 
-  setTheme(getCookieTheme() || getStoredTheme() || root.dataset.theme || "dark");
+  setTheme(getCookieTheme() || getStoredTheme() || root.dataset.theme || "light");
 
   if (toggle) {
     toggle.addEventListener("click", function () {

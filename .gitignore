@@ -49,3 +49,9 @@ docs/*.local.md
 # generated native folders
 /ios
 /android
+
+# additional secret/certificate material
+*.pfx
+secrets/
+credentials/
+*.local
