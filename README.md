@@ -80,6 +80,7 @@ npm start -- --tunnel --clear
 ```bash
 npm test
 npm run typecheck
+npm run build:site
 ```
 
 ## Main files
@@ -93,7 +94,8 @@ npm run typecheck
 - `src/utils/jobSorting.ts` — local sort presets, location grouping and filters
 - `src/utils/textShortcuts.ts` — plain-text shortcut insertion helpers
 - `src/utils/handover.ts` — end-of-shift review text generation
-- `docs/` — public project page, data handling, deployment, clinical safety and hazard notes
+- `landing/` — Vite + React + TypeScript source for the public project page
+- `docs/` — generated Cloudflare Pages output, clinical safety notes and deployment documents
 
 ## Known limitations
 

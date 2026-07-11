@@ -1,0 +1,34 @@
+/* Canonical public-estate tokens for sangeev.me and small project pages.
+   Keep this file byte-identical across sangeev.me, opnotes.sangeev.me and scratchpad.sangeev.me. */
+:root {
+  color-scheme: light;
+  --bg: #f4f0e8;
+  --panel: #fbf8f2;
+  --text: #1d1b18;
+  --text-strong: #1d1b18;
+  --text-muted: #655e55;
+  --border: #c7b8a5;
+  --border-strong: #9b8770;
+  --accent: #8a1538;
+  --accent-hover: #641028;
+  --warning-bg: #f8ead3;
+  --warning-border: #c7b8a5;
+  --font-sans: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-serif: ui-serif, Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1d1b18;
+  --panel: #24211d;
+  --text: #f4f0e8;
+  --text-strong: #f4f0e8;
+  --text-muted: #c7b8a5;
+  --border: #655e55;
+  --border-strong: #8b7b68;
+  --accent: #a3264d;
+  --accent-hover: #c43b63;
+  --warning-bg: #2d251b;
+  --warning-border: #655e55;
+}

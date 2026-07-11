@@ -1,0 +1,26 @@
+.theme-toggle {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: auto;
+  padding: 7px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted, var(--muted-foreground));
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.theme-toggle:hover,
+.theme-toggle:focus-visible {
+  background: transparent;
+  color: var(--primary, var(--accent));
+}
+
+.theme-toggle svg {
+  width: 15px;
+  height: 15px;
+}
