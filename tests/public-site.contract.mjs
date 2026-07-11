@@ -16,6 +16,7 @@ test('public page uses a dedicated typed Vite React entrypoint', () => {
 test('public page is plain while keeping the clinical and privacy boundaries visible', () => {
   const app = read('../landing/src/App.tsx');
 
+  assert.match(app, /<PublicEstateHeader current="scratchpad"/);
   assert.match(app, /<h1 id="page-title">Clinical Shift Scratchpad<\/h1>/);
   assert.match(app, /Do not enter patient-identifiable information/);
   assert.match(app, /not a medical record/);
@@ -32,7 +33,7 @@ test('public page uses current screenshots as aligned evidence and shared theme 
   assert.match(app, /scratchpad-active-list\.webp/);
   assert.match(app, /scratchpad-edit-job\.webp/);
   assert.match(styles, /\.screenshots \{[^}]*align-items: end;/s);
-  assert.match(app, /ThemeToggle/);
+  assert.match(app, /PublicEstateHeader/);
   assert.match(theme, /sangeevSiteTheme/);
   assert.match(theme, /Domain=\.sangeev\.me/);
   assert.ok(theme.indexOf('const cookie = readCookie()') < theme.indexOf('window.localStorage.getItem'), 'cross-subdomain cookie should take precedence over stale origin storage');

@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowUpRight, Github } from "lucide-react";
-import { ThemeToggle } from "./components/ThemeToggle";
+import { PublicEstateHeader } from "./components/PublicEstateHeader";
 import { useTheme } from "./lib/theme";
 
 const capabilities = [
@@ -14,15 +14,7 @@ function App() {
 
   return (
     <div className="site-shell">
-      <header className="site-header">
-        <a className="wordmark" href="https://sangeev.me">Sangeev</a>
-        <nav aria-label="Primary navigation">
-          <a href="https://sangeev.me">Home</a>
-          <a href="https://opnotes.sangeev.me">Op notes</a>
-          <a href="https://scratchpad.sangeev.me" aria-current="page">Scratchpad</a>
-        </nav>
-        <ThemeToggle theme={theme} onToggle={toggleTheme} />
-      </header>
+      <PublicEstateHeader current="scratchpad" theme={theme} onToggleTheme={toggleTheme} />
 
       <main>
         <section className="hero" aria-labelledby="page-title">
