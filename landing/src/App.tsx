@@ -13,10 +13,10 @@ function App() {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <div className="site-shell">
+    <>
       <PublicEstateHeader current="scratchpad" theme={theme} onToggleTheme={toggleTheme} />
-
-      <main>
+      <div className="site-shell">
+        <main>
         <section className="hero" aria-labelledby="page-title">
           <div className="hero-copy">
             <a className="back-link" href="https://sangeev.me"><ArrowLeft size={15} aria-hidden="true" /> Public tools</a>
@@ -86,8 +86,9 @@ function App() {
       <footer>
         <p>Clinical Shift Scratchpad · Maintained by Sangeev</p>
         <a href="https://sangeev.me">Back to sangeev.me</a>
-      </footer>
-    </div>
+        </footer>
+      </div>
+    </>
   );
 }
 

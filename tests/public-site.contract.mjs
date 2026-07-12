@@ -16,7 +16,7 @@ test('public page uses a dedicated typed Vite React entrypoint', () => {
 test('public page is plain while keeping the clinical and privacy boundaries visible', () => {
   const app = read('../landing/src/App.tsx');
 
-  assert.match(app, /<PublicEstateHeader current="scratchpad"/);
+  assert.match(app, /<>\s*<PublicEstateHeader current="scratchpad"[\s\S]*?<div className="site-shell">/, 'header must sit outside the page-specific content shell');
   assert.match(app, /<h1 id="page-title">Clinical Shift Scratchpad<\/h1>/);
   assert.match(app, /Do not enter patient-identifiable information/);
   assert.match(app, /not a medical record/);

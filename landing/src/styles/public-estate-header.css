@@ -1,5 +1,7 @@
 .site-header {
+  width: min(1160px, calc(100% - 40px));
   min-height: 76px;
+  margin: 0 auto;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
@@ -12,9 +14,10 @@
 .wordmark {
   justify-self: start;
   color: var(--text-strong, var(--foreground));
-  font-family: var(--font-serif, var(--font-heading, Charter, Cambria, Georgia, serif));
+  font-family: Charter, Cambria, Georgia, serif;
   font-size: 20px;
   font-weight: 600;
+  line-height: 1.2;
   text-decoration: none;
 }
 
@@ -22,6 +25,7 @@
   display: flex;
   align-items: center;
   gap: 24px;
+  line-height: 1.5;
 }
 
 .site-header nav a {
@@ -40,6 +44,7 @@
 
 @media (max-width: 760px) {
   .site-header {
+    width: min(100% - 28px, 680px);
     grid-template-columns: 1fr auto;
     min-height: 64px;
     column-gap: 16px;
