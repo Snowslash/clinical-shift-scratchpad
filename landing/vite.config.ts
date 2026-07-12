@@ -14,7 +14,7 @@ export default defineConfig({
       output: {
         entryFileNames: "assets/site-[hash].js",
         chunkFileNames: "assets/[name]-[hash].js",
-        assetFileNames: (assetInfo) => assetInfo.name?.endsWith(".css") ? "styles.css" : "assets/[name]-[hash][extname]",
+        assetFileNames: "assets/[name]-[hash][extname]",
       },
     },
   },

@@ -7,8 +7,11 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 test('public page uses a dedicated typed Vite React entrypoint', () => {
   const packageJson = JSON.parse(read('../package.json'));
   const html = read('../landing/index.html');
+  const vite = read('../landing/vite.config.ts');
 
   assert.equal(packageJson.scripts['build:site'], 'tsc -b landing/tsconfig.json && vite build --config landing/vite.config.ts');
+  assert.ok(vite.includes('assetFileNames: "assets/[name]-[hash][extname]"'));
+  assert.doesNotMatch(vite, /\? "styles\.css"/);
   assert.match(html, /src="\/src\/main\.tsx"/);
   assert.match(html, /id="root"/);
 });
