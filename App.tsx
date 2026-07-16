@@ -2,9 +2,9 @@ import { StatusBar } from 'expo-status-bar';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import {
   Alert,
-  SafeAreaView,
   Text,
   TouchableOpacity,
   useColorScheme,
@@ -40,6 +40,11 @@ const nextStatus: Record<JobStatus, JobStatus> = {
   waiting: 'done',
   done: 'pending',
 };
+
+const parseShortcutText = (value: string) => value
+  .split(/[\n,]/)
+  .map((item) => item.trim())
+  .filter(Boolean);
 
 const settingsAppearanceIsDark = (systemScheme: 'light' | 'dark' | null | undefined, appearanceMode: AppearanceMode) => {
   if (appearanceMode === 'dark') return true;
@@ -281,11 +286,6 @@ export default function App() {
     setSettings(next);
   };
 
-  const parseShortcutText = (value: string) => value
-    .split(/[\n,]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-
   const saveLocationShortcuts = async (value: string) => {
     const next = await jobStore.saveSettings({ ...settings, locationShortcuts: parseShortcutText(value) });
     setSettings(next);
@@ -315,6 +315,7 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={styles.root}>
+    <SafeAreaProvider>
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}> 
       <StatusBar style={dark ? 'light' : 'dark'} />
       <View style={[styles.header, { borderBottomColor: theme.border }]}> 
@@ -385,6 +386,7 @@ export default function App() {
         statusPhraseShortcuts={settings.statusPhraseShortcuts}
       />
     </SafeAreaView>
+    </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

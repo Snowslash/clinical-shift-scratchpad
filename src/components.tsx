@@ -239,7 +239,7 @@ function JobCard({ job, theme, compactMode, onEdit, onDelete, onStatus, onCycleS
       <View style={styles.statusRow}>
         {STATUSES.map((status) => (
           <TouchableOpacity key={status} style={[styles.statusButton, compactMode && styles.compactStatusButton, { borderColor: theme.border }, job.status === status && { backgroundColor: statusStyle[status].backgroundColor }]} onPress={() => onStatus(status)}>
-            <Text style={{ color: job.status === status ? statusStyle[status].color : theme.text, fontSize: 11, fontWeight: '800' }}>{status}</Text>
+            <Text style={{ color: job.status === status ? statusStyle[status].color : theme.text, fontSize: 12, fontWeight: '800' }}>{status}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -461,9 +461,9 @@ function UndoBar({ theme, message, count, onUndo, onDismiss }: { theme: Theme; m
 
 function SettingsScreen({ theme, settings, onSaveHours, onSaveLocationShortcuts, onSaveNoteShortcuts, onSaveStatusPhraseShortcuts, onSaveCompactMode, onSaveAppearanceMode, onSaveHapticsEnabled, onWipeAll }: { theme: Theme; settings: AppSettings; onSaveHours: (value: string) => void; onSaveLocationShortcuts: (value: string) => void; onSaveNoteShortcuts: (value: string) => void; onSaveStatusPhraseShortcuts: (value: string) => void; onSaveCompactMode: (compactMode: boolean) => void; onSaveAppearanceMode: (appearanceMode: AppearanceMode) => void; onSaveHapticsEnabled: (enabled: boolean) => void; onWipeAll: () => void }) {
   const [hoursText, setHoursText] = useState(String(settings.autoDeleteHours));
-  const [locationShortcutsText, setLocationShortcutsText] = useState(settings.locationShortcuts.join(', '));
-  const [noteShortcutsText, setNoteShortcutsText] = useState(settings.noteShortcuts.join(', '));
-  const [statusPhraseText, setStatusPhraseText] = useState(settings.statusPhraseShortcuts.join(', '));
+  const [locationShortcutsText, setLocationShortcutsText] = useState(() => settings.locationShortcuts.join(', '));
+  const [noteShortcutsText, setNoteShortcutsText] = useState(() => settings.noteShortcuts.join(', '));
+  const [statusPhraseText, setStatusPhraseText] = useState(() => settings.statusPhraseShortcuts.join(', '));
 
   useEffect(() => setHoursText(String(settings.autoDeleteHours)), [settings.autoDeleteHours]);
   useEffect(() => setLocationShortcutsText(settings.locationShortcuts.join(', ')), [settings.locationShortcuts]);

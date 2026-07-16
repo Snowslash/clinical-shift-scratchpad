@@ -52,7 +52,6 @@ export const DEFAULT_STATUS_PHRASE_SHORTCUTS = ['awaiting bloods', 'awaiting CT'
 export const MAX_STATUS_PHRASE_SHORTCUTS = 24;
 export const MAX_RADIAL_NOTE_SHORTCUTS = 8;
 export const MAX_NOTE_SHORTCUTS = 24;
-export const URGENCIES: Urgency[] = ['urgent', 'soon', 'routine'];
 export const STATUSES: JobStatus[] = ['pending', 'seen', 'waiting', 'done'];
 export const JOB_TYPES: JobType[] = ['review', 'bloods', 'imaging', 'call', 'family', 'discharge', 'prescribing', 'handover'];
 export const APPEARANCE_MODES: AppearanceMode[] = ['system', 'light', 'dark'];
