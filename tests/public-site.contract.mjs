@@ -36,9 +36,9 @@ test('public page is plain while keeping the clinical and privacy boundaries vis
   assert.match(app, /<EstateSectionTitle id="capabilities-title">A scratchpad, deliberately\.<\/EstateSectionTitle>/);
   assert.match(app, /<EstateSectionTitle id="status-title">Personal prototype\. Narrow on purpose\.<\/EstateSectionTitle>/);
   assert.match(app, /Do not enter patient-identifiable information/);
-  assert.match(app, /not a medical record/);
   assert.match(app, /No backend/);
   assert.match(app, /Source on GitHub/);
+  assert.doesNotMatch(app, /Expo · React Native · local-first|not a medical record|source of truth for patient care/);
   assert.doesNotMatch(app, /eyebrow|boundary-label|>0[1-4]</);
 });
 
