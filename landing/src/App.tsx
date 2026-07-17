@@ -34,14 +34,12 @@ function App() {
             </p>
             <div className="hero-actions">
               <a className="estate-primary-action" href="https://github.com/Snowslash/clinical-shift-scratchpad"><Github size={17} aria-hidden="true" /> Source on GitHub</a>
-              <span>Expo · React Native · local-first</span>
             </div>
           </div>
 
           <EstateBoundary className="hero-boundary" label="Safety and privacy boundary">
             <p><strong>Do not enter patient-identifiable information into this website or repository.</strong></p>
             <p>Runtime data should stay on the device. No backend, login, cloud sync, analytics, messaging, AI or EHR integration.</p>
-            <p>This is not a medical record and not a source of truth for patient care.</p>
           </EstateBoundary>
         </section>
 
