@@ -1,0 +1,2 @@
+landing/public/licenses/*.txt whitespace=-trailing-space
+docs/licenses/*.txt whitespace=-trailing-space
