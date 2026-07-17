@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
+const fontLicenses = ['OFL-Atkinson-Hyperlegible-Next.txt', 'OFL-Literata.txt'];
 
 test('public page uses a dedicated typed Vite React entrypoint', () => {
   const packageJson = JSON.parse(read('../package.json'));
@@ -15,13 +16,25 @@ test('public page uses a dedicated typed Vite React entrypoint', () => {
   assert.doesNotMatch(vite, /\? "styles\.css"/);
   assert.match(html, /src="\/src\/main\.tsx"/);
   assert.match(html, /id="root"/);
+  assert.doesNotMatch(html, /sangeev-public-tokens\.css/);
+  for (const license of fontLicenses) {
+    const canonical = read(`../node_modules/@sangeev/estate-ui/LICENSES/${license}`);
+    assert.equal(read(`../landing/public/licenses/${license}`), canonical, `source font licence drift: ${license}`);
+    assert.equal(read(`../docs/licenses/${license}`), canonical, `deployed font licence drift: ${license}`);
+  }
 });
 
 test('public page is plain while keeping the clinical and privacy boundaries visible', () => {
   const app = read('../landing/src/App.tsx');
+  const packageJson = JSON.parse(read('../package.json'));
 
-  assert.match(app, /<>\s*<PublicEstateHeader current="scratchpad"[\s\S]*?<div className="site-shell">/, 'header must sit outside the page-specific content shell');
-  assert.match(app, /<h1 id="page-title">Clinical Shift Scratchpad<\/h1>/);
+  assert.match(app, /from "@sangeev\/estate-ui"/);
+  assert.match(app, /<>\s*<PublicEstateHeader current="scratchpad"[\s\S]*?<EstateShell variant="landing">/, 'header must sit outside the named shared shell');
+  assert.equal(packageJson.dependencies['@sangeev/estate-ui'], 'file:vendor/sangeev-estate-ui-2.0.0-alpha.2.tgz');
+  assert.match(app, /<EstatePageTitle id="page-title" variant="landing">Clinical Shift Scratchpad<\/EstatePageTitle>/);
+  assert.match(app, /<EstateSectionTitle id="evidence-title">Built for the busy middle of a shift\.<\/EstateSectionTitle>/);
+  assert.match(app, /<EstateSectionTitle id="capabilities-title">A scratchpad, deliberately\.<\/EstateSectionTitle>/);
+  assert.match(app, /<EstateSectionTitle id="status-title">Personal prototype\. Narrow on purpose\.<\/EstateSectionTitle>/);
   assert.match(app, /Do not enter patient-identifiable information/);
   assert.match(app, /not a medical record/);
   assert.match(app, /No backend/);
@@ -32,13 +45,13 @@ test('public page is plain while keeping the clinical and privacy boundaries vis
 test('public page uses current screenshots as aligned evidence and shared theme persistence', () => {
   const app = read('../landing/src/App.tsx');
   const styles = read('../landing/src/styles.css');
-  const theme = read('../landing/src/lib/theme.ts');
+  const main = read('../landing/src/main.tsx');
 
   assert.match(app, /scratchpad-active-list\.webp/);
   assert.match(app, /scratchpad-edit-job\.webp/);
   assert.match(styles, /\.screenshots \{[^}]*align-items: end;/s);
+  assert.match(styles, /@sangeev\/estate-ui\/contract\.css/);
   assert.match(app, /PublicEstateHeader/);
-  assert.match(theme, /sangeevSiteTheme/);
-  assert.match(theme, /Domain=\.sangeev\.me/);
-  assert.ok(theme.indexOf('const cookie = readCookie()') < theme.indexOf('window.localStorage.getItem'), 'cross-subdomain cookie should take precedence over stale origin storage');
+  assert.match(app, /useEstateTheme/);
+  assert.match(main, /initialiseEstateTheme\(\)/);
 });
