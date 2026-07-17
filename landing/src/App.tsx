@@ -1,7 +1,8 @@
-import { ArrowLeft, ArrowUpRight, Github } from "lucide-react";
+import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import {
   EstateBoundary,
   EstateEvidenceFrame,
+  GitHubMark,
   EstatePageTitle,
   EstateSectionTitle,
   EstateShell,
@@ -33,7 +34,7 @@ function App() {
               I made it because jobs kept ending up split between paper, screenshots and memory during busy shifts. Capture the job quickly, add only the structure that helps, then clear it when the shift is done.
             </p>
             <div className="hero-actions">
-              <a className="estate-primary-action" href="https://github.com/Snowslash/clinical-shift-scratchpad"><Github size={17} aria-hidden="true" /> Source on GitHub</a>
+              <a className="estate-primary-action estate-icon-action" href="https://github.com/Snowslash/clinical-shift-scratchpad" aria-label="Source on GitHub" title="Source on GitHub"><GitHubMark size={18} /></a>
             </div>
           </div>
 

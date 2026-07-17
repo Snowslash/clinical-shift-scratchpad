@@ -30,14 +30,15 @@ test('public page is plain while keeping the clinical and privacy boundaries vis
 
   assert.match(app, /from "@sangeev\/estate-ui"/);
   assert.match(app, /<>\s*<PublicEstateHeader current="scratchpad"[\s\S]*?<EstateShell variant="landing">/, 'header must sit outside the named shared shell');
-  assert.equal(packageJson.dependencies['@sangeev/estate-ui'], 'file:vendor/sangeev-estate-ui-2.0.0-alpha.2.tgz');
+  assert.equal(packageJson.dependencies['@sangeev/estate-ui'], 'file:vendor/sangeev-estate-ui-2.0.0-alpha.3.tgz');
   assert.match(app, /<EstatePageTitle id="page-title" variant="landing">Clinical Shift Scratchpad<\/EstatePageTitle>/);
   assert.match(app, /<EstateSectionTitle id="evidence-title">Built for the busy middle of a shift\.<\/EstateSectionTitle>/);
   assert.match(app, /<EstateSectionTitle id="capabilities-title">A scratchpad, deliberately\.<\/EstateSectionTitle>/);
   assert.match(app, /<EstateSectionTitle id="status-title">Personal prototype\. Narrow on purpose\.<\/EstateSectionTitle>/);
   assert.match(app, /Do not enter patient-identifiable information/);
   assert.match(app, /No backend/);
-  assert.match(app, /Source on GitHub/);
+  assert.match(app, /className="estate-primary-action estate-icon-action" href="https:\/\/github\.com\/Snowslash\/clinical-shift-scratchpad" aria-label="Source on GitHub" title="Source on GitHub"><GitHubMark/);
+  assert.doesNotMatch(app, /<Github/);
   assert.doesNotMatch(app, /Expo · React Native · local-first|not a medical record|source of truth for patient care/);
   assert.doesNotMatch(app, /eyebrow|boundary-label|>0[1-4]</);
 });
