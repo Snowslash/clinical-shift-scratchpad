@@ -24,6 +24,18 @@ test('public page uses a dedicated typed Vite React entrypoint', () => {
   }
 });
 
+test('public page publishes canonical crawler discovery files', () => {
+  for (const directory of ['landing/public', 'docs']) {
+    const robots = read(`../${directory}/robots.txt`);
+    const sitemap = read(`../${directory}/sitemap.xml`);
+    assert.equal(robots, 'User-agent: *\nAllow: /\n\nSitemap: https://scratchpad.sangeev.me/sitemap.xml\n');
+    assert.match(sitemap, /^<\?xml version="1\.0" encoding="UTF-8"\?>/);
+    assert.match(sitemap, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/);
+    assert.match(sitemap, /<loc>https:\/\/scratchpad\.sangeev\.me\/<\/loc>/);
+    assert.doesNotMatch(sitemap, /<html\b/i);
+  }
+});
+
 test('public page is plain while keeping the clinical and privacy boundaries visible', () => {
   const app = read('../landing/src/App.tsx');
   const packageJson = JSON.parse(read('../package.json'));

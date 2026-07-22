@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://scratchpad.sangeev.me/sitemap.xml
