@@ -18,7 +18,7 @@ main { padding-bottom: 72px; }
 .hero { min-height: 500px; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr); align-items: center; gap: clamp(48px, 8vw, 110px); padding: 58px 0; border-bottom: 1px solid var(--border); }
 .hero-copy { max-width: 760px; }
 .back-link { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 38px; color: var(--text-muted); font-size: 13px; text-decoration: none; }
-.back-link:hover { color: var(--accent); }
+.back-link:hover { text-decoration-line: underline; }
 h1, h2, h3, p { margin-top: 0; }
 h1, h2, h3 { color: var(--text-strong); font-family: var(--font-serif); font-weight: 500; letter-spacing: -0.02em; }
 h1 { max-width: none; margin-bottom: 12px; color: var(--accent); font-size: clamp(38px, 4.5vw, 56px); line-height: 1.06; text-wrap: balance; }
@@ -48,11 +48,11 @@ figcaption { margin-top: 14px; color: var(--text-muted); font-size: 14px; }
 .status-band { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 28px; align-items: start; padding: 54px 0; border-bottom: 1px solid var(--border); }
 .status-band div > p:last-child { max-width: 68ch; margin: 15px 0 0; color: var(--text-muted); }
 .status-band > a { display: inline-flex; align-items: center; gap: 8px; margin-top: 35px; color: var(--text-strong); font-weight: 650; white-space: nowrap; text-decoration: none; }
-.status-band > a:hover { color: var(--accent); }
+.status-band > a:hover { text-decoration-line: underline; }
 footer { display: flex; justify-content: space-between; gap: 24px; padding: 22px 0 42px; color: var(--text-muted); font-size: 13px; }
 footer p { margin: 0; }
 footer a { text-decoration: none; }
-footer a:hover { color: var(--accent); }
+footer a:hover { text-decoration-line: underline; }
 
 @media (max-width: 760px) {
 

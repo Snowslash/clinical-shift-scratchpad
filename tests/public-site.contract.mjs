@@ -68,3 +68,14 @@ test('public page uses current screenshots as aligned evidence and shared theme 
   assert.match(app, /useEstateTheme/);
   assert.match(main, /initialiseEstateTheme\(\)/);
 });
+
+test('public landing links keep their accessible foreground colour on hover', () => {
+  const styles = read('../landing/src/styles.css');
+
+  assert.doesNotMatch(styles, /\.back-link:hover \{ color: var\(--accent\); \}/);
+  assert.doesNotMatch(styles, /\.status-band > a:hover \{ color: var\(--accent\); \}/);
+  assert.doesNotMatch(styles, /footer a:hover \{ color: var\(--accent\); \}/);
+  assert.match(styles, /\.back-link:hover \{ text-decoration-line: underline; \}/);
+  assert.match(styles, /\.status-band > a:hover \{ text-decoration-line: underline; \}/);
+  assert.match(styles, /footer a:hover \{ text-decoration-line: underline; \}/);
+});
