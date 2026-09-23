@@ -46,7 +46,7 @@ const parseShortcutText = (value: string) => value
   .map((item) => item.trim())
   .filter(Boolean);
 
-const settingsAppearanceIsDark = (systemScheme: 'light' | 'dark' | null | undefined, appearanceMode: AppearanceMode) => {
+const settingsAppearanceIsDark = (systemScheme: ReturnType<typeof useColorScheme>, appearanceMode: AppearanceMode) => {
   if (appearanceMode === 'dark') return true;
   if (appearanceMode === 'light') return false;
   return systemScheme !== 'light';

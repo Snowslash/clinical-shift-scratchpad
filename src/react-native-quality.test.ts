@@ -13,10 +13,10 @@ const packageJson = JSON.parse(readFileSync(path.join(projectRoot, 'package.json
 };
 
 describe('React Native quality boundaries', () => {
-  it('uses the Expo 54 safe-area context provider instead of deprecated React Native SafeAreaView', () => {
+  it('uses the SDK-compatible safe-area context provider instead of deprecated React Native SafeAreaView', () => {
     const reactNativeImport = appSource.match(/import\s+\{([^}]*)\}\s+from 'react-native';/)?.[1] ?? '';
 
-    expect(packageJson.dependencies?.['react-native-safe-area-context']).toBe('~5.6.0');
+    expect(packageJson.dependencies?.['react-native-safe-area-context']).toBe('~5.7.0');
     expect(appSource).toContain("import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';");
     expect(reactNativeImport).not.toContain('SafeAreaView');
     const providerOpen = appSource.indexOf('<SafeAreaProvider>');

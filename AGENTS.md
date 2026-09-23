@@ -9,6 +9,6 @@
 - Define success criteria before substantial changes, then verify with the project's tests/build/lint/smoke checks before reporting completion.
 - Remove only dead code/imports introduced by your own changes unless explicitly asked to clean wider code.
 
-This prototype currently uses Expo SDK 54. Check the versioned Expo SDK 54 documentation before changing Expo-specific code:
+This prototype currently uses Expo SDK 57. Check the versioned Expo SDK 57 documentation before changing Expo-specific code:
 
-https://docs.expo.dev/versions/v54.0.0/
+https://docs.expo.dev/versions/v57.0.0/

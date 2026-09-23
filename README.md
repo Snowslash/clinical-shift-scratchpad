@@ -41,9 +41,10 @@ Do not enter patient-identifiable information into public pages, screenshots or 
 
 ## Requirements
 
-- Node.js 20+
+- Node.js 22.23+ within Node 22 LTS (the shared estate UI package requires Node <23)
 - npm
 - Expo-compatible phone, simulator, emulator or browser target
+- For Expo Go testing, an Expo Go build supporting **SDK 57**; a different SDK build will report that the project is incompatible.
 
 ## Set up
 
