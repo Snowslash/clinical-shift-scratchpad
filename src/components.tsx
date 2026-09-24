@@ -3,7 +3,7 @@ import { FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
 import { LongPressGestureHandler, State } from 'react-native-gesture-handler';
 import { APPEARANCE_MODES, AppearanceMode, AppSettings, ClinicalJob, DEFAULT_APPEARANCE_MODE, DEFAULT_AUTO_DELETE_HOURS, DEFAULT_COMPACT_MODE, DEFAULT_LOCATION_SHORTCUTS, DEFAULT_NOTE_SHORTCUTS, DEFAULT_STATUS_PHRASE_SHORTCUTS, MAX_RADIAL_NOTE_SHORTCUTS, JobFilter, JobStatus, JobType, JOB_TYPES, SORT_PRESETS, SortPreset, STATUSES, Urgency } from './types/job';
 import { insertTextShortcut } from './utils/textShortcuts';
-import { styles, Theme } from './theme';
+import { badgeStyles, stylesForTheme, Theme } from './theme';
 
 export type JobFormState = {
   id?: string;
@@ -115,6 +115,7 @@ function JobsScreen({
   onStartShift: () => void;
   onEndShift: () => void;
 }) {
+  const styles = stylesForTheme(theme);
   const renderJob = (item: ClinicalJob) => (
     <JobCard
       job={item}
@@ -140,7 +141,7 @@ function JobsScreen({
             <Text style={[styles.helpText, { color: theme.muted }]}>{shiftStartedAt ? `Started ${formatAge(shiftStartedAt)} ago · ${shiftStats.active} active · ${shiftStats.completed} done` : 'No local shift timer running'}</Text>
           </View>
           <TouchableOpacity style={[styles.toggleButton, { borderColor: theme.border }, shiftStartedAt && styles.toggleButtonActive]} onPress={shiftStartedAt ? onEndShift : onStartShift}>
-            <Text style={{ color: shiftStartedAt ? '#ffffff' : theme.text, fontWeight: '900' }}>{shiftStartedAt ? 'End' : 'Start'}</Text>
+            <Text style={{ color: shiftStartedAt ? theme.primaryText : theme.text, fontWeight: '900' }}>{shiftStartedAt ? 'End' : 'Start'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -148,7 +149,7 @@ function JobsScreen({
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalControls} contentContainerStyle={styles.horizontalControlContent}>
         {(['all', ...STATUSES] as JobFilter[]).map((item) => (
           <TouchableOpacity key={item} style={[styles.filterChip, { borderColor: theme.border }, filter === item && styles.filterChipActive]} onPress={() => onFilter(item)}>
-            <Text style={{ color: filter === item ? '#ffffff' : theme.text, fontWeight: '700' }}>{item}</Text>
+            <Text style={{ color: filter === item ? theme.primaryText : theme.text, fontWeight: '700' }}>{item}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -156,11 +157,11 @@ function JobsScreen({
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalControls} contentContainerStyle={styles.horizontalControlContent}>
         {SORT_PRESETS.map((preset) => (
           <TouchableOpacity key={preset} style={[styles.filterChip, { borderColor: theme.border }, sortPreset === preset && styles.filterChipActive]} onPress={() => onSortPreset(preset)}>
-            <Text style={{ color: sortPreset === preset ? '#ffffff' : theme.text, fontWeight: '700' }}>{preset.replace(/([A-Z])/g, ' $1').toLowerCase()}</Text>
+            <Text style={{ color: sortPreset === preset ? theme.primaryText : theme.text, fontWeight: '700' }}>{preset.replace(/([A-Z])/g, ' $1').toLowerCase()}</Text>
           </TouchableOpacity>
         ))}
         <TouchableOpacity style={[styles.filterChip, { borderColor: theme.border }, groupByLocationEnabled && styles.filterChipActive]} onPress={onToggleGroupByLocation}>
-          <Text style={{ color: groupByLocationEnabled ? '#ffffff' : theme.text, fontWeight: '700' }}>group location</Text>
+          <Text style={{ color: groupByLocationEnabled ? theme.primaryText : theme.text, fontWeight: '700' }}>group location</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -207,6 +208,7 @@ function JobsScreen({
 }
 
 function JobCard({ job, theme, compactMode, onEdit, onDelete, onStatus, onCycleStatus, onTogglePinned, onBump, onDuplicate, onChase }: { job: ClinicalJob; theme: Theme; compactMode: boolean; onEdit: () => void; onDelete: () => void; onStatus: (status: JobStatus) => void; onCycleStatus: () => void; onTogglePinned: () => void; onBump: () => void; onDuplicate: () => void; onChase: () => void }) {
+  const styles = stylesForTheme(theme);
   const updatedLabel = job.status === 'waiting' ? `waiting ${formatAge(job.updatedAt)}` : `updated ${formatAge(job.updatedAt)}`;
   return (
     <View style={[styles.card, compactMode && styles.compactCard, { backgroundColor: theme.card, borderColor: theme.border }, job.status === 'done' && styles.doneCard, job.pinned && styles.pinnedCard]}>
@@ -221,9 +223,9 @@ function JobCard({ job, theme, compactMode, onEdit, onDelete, onStatus, onCycleS
           {job.chaseCount ? <Badge label={`chased ${job.chaseCount}`} color="#e0e7ff" backgroundColor="#3730a3" /> : null}
         </View>
         <View style={styles.cardActions}>
-          <TouchableOpacity style={styles.iconActionButton} onPress={onTogglePinned}><Text style={{ color: job.pinned ? '#fbbf24' : theme.text, fontWeight: '900' }}>{job.pinned ? '★' : '☆'}</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.iconActionButton} onPress={onTogglePinned}><Text style={{ color: job.pinned ? theme.pin : theme.text, fontWeight: '900' }}>{job.pinned ? '★' : '☆'}</Text></TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={onEdit}><Text style={{ color: theme.text, fontWeight: '700' }}>Edit</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={onDelete}><Text style={{ color: '#fca5a5', fontWeight: '700' }}>Del</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={onDelete}><Text style={{ color: theme.destructive, fontWeight: '700' }}>Del</Text></TouchableOpacity>
         </View>
       </View>
 
@@ -259,6 +261,7 @@ function JobCard({ job, theme, compactMode, onEdit, onDelete, onStatus, onCycleS
 }
 
 function JobFormModal({ visible, theme, form, onChange, onClose, onSave, locationShortcuts, noteShortcuts, statusPhraseShortcuts }: { visible: boolean; theme: Theme; form: JobFormState; onChange: (form: JobFormState) => void; onClose: () => void; onSave: (keepOpen?: boolean) => void; locationShortcuts: string[]; noteShortcuts: string[]; statusPhraseShortcuts: string[] }) {
+  const styles = stylesForTheme(theme);
   const taskInputRef = useRef<TextInput>(null);
   const locationInputRef = useRef<TextInput>(null);
   const waitingInputRef = useRef<TextInput>(null);
@@ -346,7 +349,7 @@ function JobFormModal({ visible, theme, form, onChange, onClose, onSave, locatio
           <View style={styles.typeChipRow}>
             {JOB_TYPES.map((jobType) => (
               <TouchableOpacity key={jobType} style={[styles.typeChip, { borderColor: theme.border }, form.jobType === jobType && styles.typeChipActive]} onPress={() => onChange({ ...form, jobType: form.jobType === jobType ? undefined : jobType })}>
-                <Text style={{ color: form.jobType === jobType ? '#ffffff' : theme.text, fontWeight: '900' }}>{jobTypeLabels[jobType]}</Text>
+                <Text style={{ color: form.jobType === jobType ? theme.primaryText : theme.text, fontWeight: '900' }}>{jobTypeLabels[jobType]}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -374,6 +377,7 @@ function JobFormModal({ visible, theme, form, onChange, onClose, onSave, locatio
 }
 
 function HandoverScreen({ theme, handoverText, jobs, onCopy, onClearCompleted, onWipeAll }: { theme: Theme; handoverText: string; jobs: ClinicalJob[]; onCopy: () => void; onClearCompleted: () => void; onWipeAll: () => void }) {
+  const styles = stylesForTheme(theme);
   const active = jobs.filter((job) => job.status !== 'done');
   const completed = jobs.filter((job) => job.status === 'done');
   return (
@@ -406,6 +410,7 @@ function HandoverScreen({ theme, handoverText, jobs, onCopy, onClearCompleted, o
 }
 
 function ShortcutMenu({ visible, theme, title, options, onSelect, onClose }: { visible: boolean; theme: Theme; title: string; options: string[]; onSelect: (shortcut: string) => void; onClose: () => void }) {
+  const styles = stylesForTheme(theme);
   const cleanOptions = options.filter(Boolean).slice(0, MAX_RADIAL_NOTE_SHORTCUTS);
   const radius = cleanOptions.length <= 4 ? 82 : 108;
   const center = 136;
@@ -446,6 +451,7 @@ function ShortcutMenu({ visible, theme, title, options, onSelect, onClose }: { v
 }
 
 function UndoBar({ theme, message, count, onUndo, onDismiss }: { theme: Theme; message: string; count: number; onUndo: () => void; onDismiss: () => void }) {
+  const styles = stylesForTheme(theme);
   return (
     <View style={[styles.undoBar, { backgroundColor: theme.undoBackground, borderColor: theme.border }]}> 
       <Text style={[styles.undoText, { color: theme.text }]} numberOfLines={1}>{message}{count > 1 ? ` · ${count} undo steps` : ''}</Text>
@@ -460,6 +466,7 @@ function UndoBar({ theme, message, count, onUndo, onDismiss }: { theme: Theme; m
 }
 
 function SettingsScreen({ theme, settings, onSaveHours, onSaveLocationShortcuts, onSaveNoteShortcuts, onSaveStatusPhraseShortcuts, onSaveCompactMode, onSaveAppearanceMode, onSaveHapticsEnabled, onWipeAll }: { theme: Theme; settings: AppSettings; onSaveHours: (value: string) => void; onSaveLocationShortcuts: (value: string) => void; onSaveNoteShortcuts: (value: string) => void; onSaveStatusPhraseShortcuts: (value: string) => void; onSaveCompactMode: (compactMode: boolean) => void; onSaveAppearanceMode: (appearanceMode: AppearanceMode) => void; onSaveHapticsEnabled: (enabled: boolean) => void; onWipeAll: () => void }) {
+  const styles = stylesForTheme(theme);
   const [hoursText, setHoursText] = useState(String(settings.autoDeleteHours));
   const [locationShortcutsText, setLocationShortcutsText] = useState(() => settings.locationShortcuts.join(', '));
   const [noteShortcutsText, setNoteShortcutsText] = useState(() => settings.noteShortcuts.join(', '));
@@ -480,7 +487,7 @@ function SettingsScreen({ theme, settings, onSaveHours, onSaveLocationShortcuts,
         <View style={styles.segmentedRow}>
           {APPEARANCE_MODES.map((mode) => (
             <TouchableOpacity key={mode} style={[styles.segment, { borderColor: theme.border }, settings.appearanceMode === mode && styles.typeChipActive]} onPress={() => onSaveAppearanceMode(mode)}>
-              <Text style={{ color: settings.appearanceMode === mode ? '#ffffff' : theme.text, fontWeight: '900' }}>{appearanceLabels[mode]}</Text>
+              <Text style={{ color: settings.appearanceMode === mode ? theme.primaryText : theme.text, fontWeight: '900' }}>{appearanceLabels[mode]}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -505,7 +512,7 @@ function SettingsScreen({ theme, settings, onSaveHours, onSaveLocationShortcuts,
             <Text style={[styles.helpText, { color: theme.muted }]}>Denser job cards for real shifts with longer active lists. Keeps touch targets; hides nothing critical.</Text>
           </View>
           <TouchableOpacity style={[styles.toggleButton, { borderColor: theme.border }, settings.compactMode && styles.toggleButtonActive]} onPress={() => onSaveCompactMode(!settings.compactMode)}>
-            <Text style={{ color: settings.compactMode ? '#ffffff' : theme.text, fontWeight: '900' }}>{settings.compactMode ? 'On' : 'Off'}</Text>
+            <Text style={{ color: settings.compactMode ? theme.primaryText : theme.text, fontWeight: '900' }}>{settings.compactMode ? 'On' : 'Off'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -517,7 +524,7 @@ function SettingsScreen({ theme, settings, onSaveHours, onSaveLocationShortcuts,
             <Text style={[styles.helpText, { color: theme.muted }]}>Light tactile confirmation for add, bump, chase, status, undo. Best-effort only; not a safety alert.</Text>
           </View>
           <TouchableOpacity style={[styles.toggleButton, { borderColor: theme.border }, settings.hapticsEnabled && styles.toggleButtonActive]} onPress={() => onSaveHapticsEnabled(!settings.hapticsEnabled)}>
-            <Text style={{ color: settings.hapticsEnabled ? '#ffffff' : theme.text, fontWeight: '900' }}>{settings.hapticsEnabled ? 'On' : 'Off'}</Text>
+            <Text style={{ color: settings.hapticsEnabled ? theme.primaryText : theme.text, fontWeight: '900' }}>{settings.hapticsEnabled ? 'On' : 'Off'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -587,8 +594,8 @@ function SettingsScreen({ theme, settings, onSaveHours, onSaveLocationShortcuts,
 
 function Badge({ label, color, backgroundColor }: { label: string; color: string; backgroundColor: string }) {
   return (
-    <View style={[styles.badge, { backgroundColor }]}>
-      <Text style={[styles.badgeText, { color }]}>{label}</Text>
+    <View style={[badgeStyles.badge, { backgroundColor }]}>
+      <Text style={[badgeStyles.badgeText, { color }]}>{label}</Text>
     </View>
   );
 }

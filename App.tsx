@@ -16,7 +16,7 @@ import { jobStore } from './src/services/jobStore';
 import { filterJobs, groupJobsByLocation, sortJobs } from './src/utils/jobSorting';
 import { buildHandoverText } from './src/utils/handover';
 import { JobsScreen, HandoverScreen, SettingsScreen, JobFormModal, UndoBar, JobFormState } from './src/components';
-import { darkTheme, lightTheme, styles } from './src/theme';
+import { darkTheme, lightTheme, stylesForTheme } from './src/theme';
 
 type Screen = 'jobs' | 'review' | 'settings';
 type UndoState = {
@@ -59,6 +59,7 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>({ autoDeleteHours: DEFAULT_AUTO_DELETE_HOURS, locationShortcuts: DEFAULT_LOCATION_SHORTCUTS, noteShortcuts: DEFAULT_NOTE_SHORTCUTS, compactMode: DEFAULT_COMPACT_MODE, appearanceMode: DEFAULT_APPEARANCE_MODE, statusPhraseShortcuts: DEFAULT_STATUS_PHRASE_SHORTCUTS, hapticsEnabled: true });
   const dark = settingsAppearanceIsDark(colorScheme, settings.appearanceMode);
   const theme = dark ? darkTheme : lightTheme;
+  const styles = stylesForTheme(theme);
   const [filter, setFilter] = useState<JobFilter>('all');
   const [form, setForm] = useState<JobFormState>(emptyForm);
   const [formVisible, setFormVisible] = useState(false);
@@ -328,7 +329,7 @@ export default function App() {
       <View style={[styles.tabs, { borderBottomColor: theme.border }]}> 
         {(['jobs', 'review', 'settings'] as Screen[]).map((item) => (
           <TouchableOpacity key={item} style={[styles.tab, screen === item && styles.tabActive]} onPress={() => setScreen(item)}>
-            <Text style={[styles.tabText, { color: screen === item ? '#ffffff' : theme.text }]}>{item}</Text>
+            <Text style={[styles.tabText, { color: screen === item ? theme.primaryText : theme.text }]}>{item}</Text>
           </TouchableOpacity>
         ))}
       </View>

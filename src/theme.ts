@@ -1,51 +1,65 @@
 import { Platform, StyleSheet } from 'react-native';
 
-
+// Native colour adapter for @sangeev/estate-ui 2.0.0-alpha.3 / contract.css.
+// React Native cannot consume the package's CSS. The native-estate-theme tests
+// resolve its pinned semantic tokens and reject drift in these light/dark roles.
+// Keep native layout, system/manual appearance and labelled status cues separate.
 export const darkTheme = {
-  background: '#1d1b18',
-  card: '#24211d',
-  text: '#f4f0e8',
-  muted: '#c7b8a5',
-  border: '#655e55',
-  placeholder: '#8b7b68',
-  warning: '#a3264d',
-  undoBackground: '#24211d',
-  secondaryActionBackground: '#302b25',
-  secondaryActionText: '#f4f0e8',
+  background: '#0b655f',
+  card: '#073f3c',
+  text: '#f5fffc',
+  muted: '#d9eee9',
+  border: '#3b8c83',
+  placeholder: '#d9eee9',
+  // Coral text on atlas is too faint for the clipboard warning: use foreground.
+  warning: '#f5fffc',
+  undoBackground: '#073f3c',
+  secondaryActionBackground: '#0a5652',
+  secondaryActionText: '#f5fffc',
+  primary: '#ff7a66',
+  primaryText: '#092c2a',
+  destructive: '#ffb0a3',
+  destructiveText: '#092c2a',
+  pin: '#c4eb62',
 };
 
 export const lightTheme = {
-  background: '#f4f0e8',
-  card: '#fbf8f2',
-  text: '#1d1b18',
-  muted: '#655e55',
-  border: '#c7b8a5',
-  placeholder: '#9b8770',
-  warning: '#8a1538',
-  undoBackground: '#fbf8f2',
-  secondaryActionBackground: '#eadfce',
-  secondaryActionText: '#1d1b18',
+  background: '#d9eee9',
+  card: '#f5fffc',
+  text: '#092c2a',
+  muted: '#0a5652',
+  border: '#3b8c83',
+  placeholder: '#0a5652',
+  warning: '#a33838',
+  undoBackground: '#f5fffc',
+  secondaryActionBackground: '#c5e3dd',
+  secondaryActionText: '#092c2a',
+  primary: '#0b655f',
+  primaryText: '#f5fffc',
+  destructive: '#a33838',
+  destructiveText: '#f5fffc',
+  pin: '#0b655f',
 };
 
 export type Theme = typeof darkTheme;
 
-export const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   root: { flex: 1 },
   safe: { flex: 1 },
   header: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: 24, fontWeight: '900' },
   subtitle: { fontSize: 13, marginTop: 2 },
-  primaryButton: { backgroundColor: '#8a1538', paddingHorizontal: 18, paddingVertical: 12, borderRadius: 14, minHeight: 46, justifyContent: 'center' },
-  primaryButtonLarge: { backgroundColor: '#8a1538', paddingHorizontal: 18, paddingVertical: 14, borderRadius: 14, minHeight: 50, justifyContent: 'center', alignItems: 'center', marginTop: 16 },
-  primaryButtonText: { color: '#ffffff', fontWeight: '900', fontSize: 16 },
+  primaryButton: { backgroundColor: theme.primary, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 14, minHeight: 46, justifyContent: 'center' },
+  primaryButtonLarge: { backgroundColor: theme.primary, paddingHorizontal: 18, paddingVertical: 14, borderRadius: 14, minHeight: 50, justifyContent: 'center', alignItems: 'center', marginTop: 16 },
+  primaryButtonText: { color: theme.primaryText, fontWeight: '900', fontSize: 16 },
   tabs: { flexDirection: 'row', padding: 8, borderBottomWidth: 1, gap: 8 },
   tab: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
-  tabActive: { backgroundColor: '#8a1538' },
+  tabActive: { backgroundColor: theme.primary },
   tabText: { fontWeight: '900', textTransform: 'capitalize' },
   body: { flex: 1, paddingHorizontal: 10 },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingVertical: 8 },
   filterChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7, minHeight: 36 },
-  filterChipActive: { backgroundColor: '#8a1538', borderColor: '#8a1538' },
+  filterChipActive: { backgroundColor: theme.primary, borderColor: theme.primary },
   listContent: { paddingBottom: 132 },
   emptyList: { flexGrow: 1, justifyContent: 'center' },
   emptyState: { alignItems: 'center', paddingHorizontal: 32 },
@@ -53,7 +67,7 @@ export const styles = StyleSheet.create({
   emptyText: { marginTop: 6, fontSize: 15 },
   card: { borderWidth: 1, borderRadius: 14, padding: 10, marginBottom: 8 },
   compactCard: { padding: 7, marginBottom: 6 },
-  pinnedCard: { borderLeftWidth: 5, borderLeftColor: '#8a1538' },
+  pinnedCard: { borderLeftWidth: 5, borderLeftColor: theme.primary },
   doneCard: { opacity: 0.72 },
   cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, flex: 1 },
@@ -75,13 +89,13 @@ export const styles = StyleSheet.create({
   bottomActionColumn: { position: 'absolute', left: 12, right: 12, bottom: 12, gap: 8 },
   bottomActionRow: { flexDirection: 'row', gap: 8 },
   sameLocationButton: { borderWidth: 1, borderRadius: 14, padding: 11, alignItems: 'center', minHeight: 44, justifyContent: 'center' },
-  bottomAddButton: { flex: 1, backgroundColor: '#8a1538', borderRadius: 14, padding: 14, alignItems: 'center', minHeight: 52, justifyContent: 'center' },
+  bottomAddButton: { flex: 1, backgroundColor: theme.primary, borderRadius: 14, padding: 14, alignItems: 'center', minHeight: 52, justifyContent: 'center' },
   clearDoneButton: { flex: 1, borderWidth: 1, borderRadius: 14, padding: 14, alignItems: 'center', minHeight: 52, justifyContent: 'center' },
   modalSafe: { flex: 1 },
   modalHeader: { height: 60, borderBottomWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12 },
   modalHeaderButton: { minWidth: 78, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
-  modalSaveButton: { backgroundColor: '#8a1538', borderRadius: 12, paddingHorizontal: 12 },
-  modalSaveText: { color: '#ffffff', fontWeight: '900', fontSize: 16 },
+  modalSaveButton: { backgroundColor: theme.primary, borderRadius: 12, paddingHorizontal: 12 },
+  modalSaveText: { color: theme.primaryText, fontWeight: '900', fontSize: 16 },
   modalTitle: { fontSize: 18, fontWeight: '900' },
   formContent: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 180 },
   label: { fontSize: 14, fontWeight: '900', marginBottom: 6, marginTop: 10 },
@@ -107,7 +121,7 @@ export const styles = StyleSheet.create({
   segmentedRow: { flexDirection: 'row', gap: 8 },
   typeChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   typeChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 8, minHeight: 38 },
-  typeChipActive: { backgroundColor: '#8a1538', borderColor: '#8a1538' },
+  typeChipActive: { backgroundColor: theme.primary, borderColor: theme.primary },
   segment: { flex: 1, borderWidth: 1, borderRadius: 14, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   handoverContent: { paddingVertical: 16, paddingBottom: 42 },
   sectionTitle: { fontSize: 22, fontWeight: '900', marginBottom: 8 },
@@ -116,8 +130,8 @@ export const styles = StyleSheet.create({
   handoverText: { fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }), fontSize: 15, lineHeight: 22 },
   undoBar: { position: 'absolute', left: 12, right: 12, bottom: 74, borderWidth: 1, borderRadius: 14, paddingVertical: 10, paddingLeft: 14, paddingRight: 8, minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 10, shadowColor: '#000', shadowOpacity: 0.24, shadowRadius: 10, elevation: 6 },
   undoText: { flex: 1, fontSize: 14, fontWeight: '800' },
-  undoButton: { backgroundColor: '#8a1538', borderRadius: 10, paddingHorizontal: 14, minHeight: 36, justifyContent: 'center' },
-  undoButtonText: { color: '#ffffff', fontWeight: '900' },
+  undoButton: { backgroundColor: theme.primary, borderRadius: 10, paddingHorizontal: 14, minHeight: 36, justifyContent: 'center' },
+  undoButtonText: { color: theme.primaryText, fontWeight: '900' },
   undoDismiss: { minWidth: 34, minHeight: 36, alignItems: 'center', justifyContent: 'center' },
   undoDismissText: { fontSize: 24, fontWeight: '700' },
   warningText: { fontSize: 13, lineHeight: 18, marginTop: 12, fontWeight: '700' },
@@ -132,7 +146,14 @@ export const styles = StyleSheet.create({
   settingsRowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   settingsRowText: { flex: 1 },
   toggleButton: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 16, minHeight: 42, alignItems: 'center', justifyContent: 'center' },
-  toggleButtonActive: { backgroundColor: '#8a1538', borderColor: '#8a1538' },
-  dangerButton: { backgroundColor: '#991b1b', padding: 16, borderRadius: 14, alignItems: 'center', marginTop: 18, minHeight: 52, justifyContent: 'center' },
-  dangerButtonText: { color: '#fee2e2', fontWeight: '900', fontSize: 16 },
+  toggleButtonActive: { backgroundColor: theme.primary, borderColor: theme.primary },
+  dangerButton: { backgroundColor: theme.destructive, padding: 16, borderRadius: 14, alignItems: 'center', marginTop: 18, minHeight: 52, justifyContent: 'center' },
+  dangerButtonText: { color: theme.destructiveText, fontWeight: '900', fontSize: 16 },
 });
+
+const lightStyles = createStyles(lightTheme);
+const darkStyles = createStyles(darkTheme);
+
+export const stylesForTheme = (theme: Theme) => theme === darkTheme ? darkStyles : lightStyles;
+// Badges retain their existing semantic cue colours; only their geometry is shared.
+export const badgeStyles = { badge: lightStyles.badge, badgeText: lightStyles.badgeText };

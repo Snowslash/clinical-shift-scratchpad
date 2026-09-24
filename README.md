@@ -88,7 +88,7 @@ npm run build:site
 
 - `App.tsx` — app shell, state orchestration, persistence calls, navigation, undo, clipboard confirmation and render shell
 - `src/components.tsx` — screens, modals, cards, radial shortcut menu, form controls and extracted UI components
-- `src/theme.ts` — light/dark theme tokens and React Native styles
+- `src/theme.ts` — native light/dark colours matched to the pinned estate package, plus existing React Native layout styles; `tests/native-estate-theme.test.ts` checks token parity and text contrast
 - `src/types/job.ts` — job, urgency, status, tag, pin, waiting-for, shift, appearance, haptics and settings types
 - `src/services/storage.ts` — replaceable local storage abstraction
 - `src/services/jobStore.ts` — local job persistence, expiry, settings, shift timer, chase metadata, wipe-all and restorable undo snapshots
