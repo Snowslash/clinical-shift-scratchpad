@@ -15,7 +15,7 @@ a { color: inherit; text-underline-offset: 0.2em; }
 
 
 main { padding-bottom: 72px; }
-.hero { min-height: 500px; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr); align-items: center; gap: clamp(48px, 8vw, 110px); padding: 58px 0; border-bottom: 1px solid var(--border); }
+.hero { min-height: 500px; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr); align-items: center; gap: clamp(48px, 8vw, 110px); padding: 58px 0; border-bottom: 1px solid var(--estate-rule); }
 .hero-copy { max-width: 760px; }
 .back-link { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 38px; color: var(--text-muted); font-size: 13px; text-decoration: none; }
 .back-link:hover { text-decoration-line: underline; }

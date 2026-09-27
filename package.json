@@ -4,7 +4,7 @@
   "main": "index.ts",
   "private": true,
   "dependencies": {
-    "@sangeev/estate-ui": "file:vendor/sangeev-estate-ui-2.0.0-alpha.3.tgz",
+    "@sangeev/estate-ui": "file:vendor/sangeev-estate-ui-2.0.0-alpha.4.tgz",
     "expo": "~57.0.24",
     "expo-clipboard": "~57.0.2",
     "expo-haptics": "~57.0.3",

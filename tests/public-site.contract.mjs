@@ -42,7 +42,7 @@ test('public page is plain while keeping the clinical and privacy boundaries vis
 
   assert.match(app, /from "@sangeev\/estate-ui"/);
   assert.match(app, /<>\s*<PublicEstateHeader current="scratchpad"[\s\S]*?<EstateShell variant="landing">/, 'header must sit outside the named shared shell');
-  assert.equal(packageJson.dependencies['@sangeev/estate-ui'], 'file:vendor/sangeev-estate-ui-2.0.0-alpha.3.tgz');
+  assert.equal(packageJson.dependencies['@sangeev/estate-ui'], 'file:vendor/sangeev-estate-ui-2.0.0-alpha.4.tgz');
   assert.match(app, /<EstatePageTitle id="page-title" variant="landing">Clinical Shift Scratchpad<\/EstatePageTitle>/);
   assert.match(app, /<EstateSectionTitle id="evidence-title">Built for the busy middle of a shift\.<\/EstateSectionTitle>/);
   assert.match(app, /<EstateSectionTitle id="capabilities-title">A scratchpad, deliberately\.<\/EstateSectionTitle>/);
@@ -78,4 +78,9 @@ test('public landing links keep their accessible foreground colour on hover', ()
   assert.match(styles, /\.back-link:hover \{ text-decoration-line: underline; \}/);
   assert.match(styles, /\.status-band > a:hover \{ text-decoration-line: underline; \}/);
   assert.match(styles, /footer a:hover \{ text-decoration-line: underline; \}/);
+});
+
+test('Deep Atlas starts with matching browser chrome and restrained section rules', () => {
+  assert.match(read('../landing/index.html'), /name="theme-color" content="#061e1d"/);
+  assert.match(read('../landing/src/styles.css'), /\.hero \{[^}]*border-bottom: 1px solid var\(--estate-rule\)/);
 });

@@ -81,6 +81,17 @@ for (const [mode, theme, tokens] of [
   });
 }
 
+it('uses approved Deep Atlas dark roles while retaining native light primary and code fonts', () => {
+  expect(nativeTheme.darkTheme).toMatchObject({
+    background: '#061e1d', card: '#0b2b29', text: '#d4e3df', muted: '#9bb8b1',
+    border: '#5f9189', placeholder: '#9bb8b1', warning: '#d4e3df',
+    undoBackground: '#0b2b29', secondaryActionBackground: '#123a37',
+    secondaryActionText: '#d4e3df', primary: '#ff7a66', destructive: '#ffb0a3',
+  });
+  expect(nativeTheme.lightTheme.primary).toBe('#0b655f');
+  expect(nativeTheme.stylesForTheme(nativeTheme.darkTheme).handoverText.fontFamily).toBe('Menlo');
+});
+
 it('does not retain burgundy/sand branding or white-on-coral selected labels', () => {
   const source = readFileSync(path.join(process.cwd(), 'src/theme.ts'), 'utf8');
   expect(source).not.toMatch(/#(?:8a1538|a3264d|1d1b18|24211d|f4f0e8|fbf8f2)\b/i);
