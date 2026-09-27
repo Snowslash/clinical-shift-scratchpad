@@ -1,21 +1,21 @@
 import { Platform, StyleSheet } from 'react-native';
 
-// Native colour adapter for @sangeev/estate-ui 2.0.0-alpha.3 / contract.css.
+// Native colour adapter for @sangeev/estate-ui 2.0.0-alpha.4 / contract.css.
 // React Native cannot consume the package's CSS. The native-estate-theme tests
 // resolve its pinned semantic tokens and reject drift in these light/dark roles.
 // Keep native layout, system/manual appearance and labelled status cues separate.
 export const darkTheme = {
-  background: '#0b655f',
-  card: '#073f3c',
-  text: '#f5fffc',
-  muted: '#d9eee9',
-  border: '#3b8c83',
-  placeholder: '#d9eee9',
-  // Coral text on atlas is too faint for the clipboard warning: use foreground.
-  warning: '#f5fffc',
-  undoBackground: '#073f3c',
-  secondaryActionBackground: '#0a5652',
-  secondaryActionText: '#f5fffc',
+  background: '#061e1d',
+  card: '#0b2b29',
+  text: '#d4e3df',
+  muted: '#9bb8b1',
+  border: '#5f9189',
+  placeholder: '#9bb8b1',
+  // Keep the clipboard warning readable without introducing a new status cue.
+  warning: '#d4e3df',
+  undoBackground: '#0b2b29',
+  secondaryActionBackground: '#123a37',
+  secondaryActionText: '#d4e3df',
   primary: '#ff7a66',
   primaryText: '#092c2a',
   destructive: '#ffb0a3',
