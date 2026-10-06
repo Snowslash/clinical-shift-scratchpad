@@ -22,7 +22,7 @@ function App() {
 
   return (
     <>
-      <PublicEstateHeader current="scratchpad" theme={theme} onToggleTheme={toggleTheme} />
+      <PublicEstateHeader current="scratchpad" navigation="projects" theme={theme} onToggleTheme={toggleTheme} />
       <EstateShell variant="landing">
         <main>
         <section className="hero" aria-labelledby="page-title">

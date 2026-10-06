@@ -24,6 +24,13 @@ test('public page uses a dedicated typed Vite React entrypoint', () => {
   }
 });
 
+test('public page distributes the shared UI MIT licence verbatim', () => {
+  const canonical = read('../node_modules/@sangeev/estate-ui/LICENSE');
+  for (const directory of ['landing/public', 'docs']) {
+    assert.equal(read(`../${directory}/licenses/MIT-estate-ui.txt`), canonical);
+  }
+});
+
 test('public page publishes canonical crawler discovery files', () => {
   for (const directory of ['landing/public', 'docs']) {
     const robots = read(`../${directory}/robots.txt`);
@@ -42,7 +49,7 @@ test('public page is plain while keeping the clinical and privacy boundaries vis
 
   assert.match(app, /from "@sangeev\/estate-ui"/);
   assert.match(app, /<>\s*<PublicEstateHeader current="scratchpad"[\s\S]*?<EstateShell variant="landing">/, 'header must sit outside the named shared shell');
-  assert.equal(packageJson.dependencies['@sangeev/estate-ui'], 'file:vendor/sangeev-estate-ui-2.0.0-alpha.4.tgz');
+  assert.equal(packageJson.dependencies['@sangeev/estate-ui'], 'file:vendor/sangeev-estate-ui-2.0.0-alpha.7.tgz');
   assert.match(app, /<EstatePageTitle id="page-title" variant="landing">Clinical Shift Scratchpad<\/EstatePageTitle>/);
   assert.match(app, /<EstateSectionTitle id="evidence-title">Built for the busy middle of a shift\.<\/EstateSectionTitle>/);
   assert.match(app, /<EstateSectionTitle id="capabilities-title">A scratchpad, deliberately\.<\/EstateSectionTitle>/);
