@@ -39,5 +39,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run && node --test tests/public-site.contract.mjs",
     "check": "npm run test && npm run typecheck && npm run build:site"
+  },
+  "overrides": {
+    "xcode@3.0.1": {
+      "uuid": "11.1.1"
+    }
   }
 }
