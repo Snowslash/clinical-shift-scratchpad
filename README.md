@@ -43,7 +43,7 @@ Do not enter patient-identifiable information into public pages, screenshots or 
 
 - Node.js 22.23+ within Node 22 LTS (the shared estate UI package requires Node <23)
 - npm
-- Expo-compatible phone, simulator, emulator or browser target
+- Expo-compatible phone, simulator or emulator (iOS/Android only)
 - For Expo Go testing, an Expo Go build supporting **SDK 57**; a different SDK build will report that the project is incompatible.
 
 ## Set up
@@ -67,8 +67,9 @@ Run on common targets:
 ```bash
 npm run android
 npm run ios
-npm run web
 ```
+
+The clinical app does not support a browser runtime: SecureStore is native-only. The separate public landing site remains available with `npm run dev:site` and `npm run build:site`.
 
 For phone testing over a tunnel:
 

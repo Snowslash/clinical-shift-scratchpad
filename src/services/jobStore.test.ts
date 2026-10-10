@@ -44,6 +44,15 @@ describe('job creation and expiry', () => {
 });
 
 describe('JobStore', () => {
+  it.each(['broken JSON', '{}', 'null', ''])('rejects corrupt job lists without overwriting them: %s', async (raw) => {
+    const storage = new MemoryStorage();
+    const key = 'clinical-shift-scratchpad/jobs/v1';
+    storage.values.set(key, raw);
+    const store = new JobStore(storage);
+    await expect(store.getJobs()).rejects.toThrow();
+    expect(storage.values.get(key)).toBe(raw);
+  });
+
   it('purges expired jobs when loading and persists the purge', async () => {
     const storage = new MemoryStorage();
     const store = new JobStore(storage, () => fixed.getTime());

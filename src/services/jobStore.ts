@@ -89,8 +89,9 @@ export class JobStore {
 
   async getJobs(): Promise<ClinicalJob[]> {
     const raw = await this.storage.getItem(JOBS_KEY);
-    const jobs = safeJsonParse<ClinicalJob[]>(raw, []);
-    const active = Array.isArray(jobs) ? jobs.filter((job) => !isExpired(job, this.nowMs())) : [];
+    const jobs: ClinicalJob[] = raw === null ? [] : JSON.parse(raw);
+    if (!Array.isArray(jobs)) throw new Error('Invalid stored job list');
+    const active = jobs.filter((job) => !isExpired(job, this.nowMs()));
     if (active.length !== jobs.length) {
       await this.saveJobs(active);
     }
