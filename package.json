@@ -5,7 +5,7 @@
   "private": true,
   "dependencies": {
     "@sangeev/estate-ui": "file:vendor/sangeev-estate-ui-2.0.0-alpha.7.tgz",
-    "expo": "~57.0.24",
+    "expo": "~57.0.27",
     "expo-clipboard": "~57.0.2",
     "expo-haptics": "~57.0.3",
     "expo-secure-store": "~57.0.4",
@@ -27,7 +27,7 @@
     "tailwindcss": "^4.3.2",
     "typescript": "~6.0.3",
     "vite": "^8.1.4",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.11"
   },
   "scripts": {
     "start": "node ./node_modules/expo/bin/cli start",
