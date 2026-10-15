@@ -1,0 +1,16 @@
+{
+  "config": "landing/src/project.ts",
+  "html": "landing/index.html",
+  "key": "scratchpad",
+  "name": "Clinical Shift Scratchpad",
+  "description": "A quick list for ward jobs during a shift. It stays on your device and clears itself when you’re done.",
+  "sourceHref": "https://github.com/Snowslash/clinical-shift-scratchpad",
+  "limits": "This is a personal prototype I’ve used on my own shifts, not finished software. It hasn’t been through the formal safety, regulatory and data-protection checks a clinical product would need, and it doesn’t keep a record of changes.",
+  "actionNote": "It’s a phone app, so there’s no web version to open.",
+  "beforeYouUse": [
+    "Don’t put anything that could identify a patient in the app, in screenshots or in the code.",
+    "Your jobs stay on your phone. There’s no account, and nothing is sent anywhere.",
+    "Jobs expire after 24 hours unless you change the setting. They’re removed when the app next checks the list. If you copy the end-of-shift summary, other apps on your phone can read it."
+  ],
+  "actions": []
+}

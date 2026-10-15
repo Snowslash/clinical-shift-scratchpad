@@ -109,3 +109,38 @@ npm run build:site
 - SecureStore properties depend on platform and OS configuration.
 - Screenshots, OS backups, phone loss, clipboard managers and shoulder-surfing remain risks.
 - Existing jobs keep their originally calculated expiry if the auto-delete interval is changed later.
+
+## Desk landing verification
+
+The public landing uses the reviewed `ProjectPage.tsx` and `project-page.css`
+template with project-specific copy in `project.ts`. Keep the template copies
+identical to the [canonical project-page source](https://github.com/Snowslash/sangeev-me/tree/main/project-pages); the estate UI dependency
+continues to own shared chrome and tokens, not this page body. The initial HTML
+keeps the introduction, safety boundaries and real destinations available without
+JavaScript. The application source and dependency pins are unchanged.
+
+Using Node 22.23+ within Node 22, install from the lockfile with `npm ci`, then run:
+
+```sh
+npx vitest run --maxWorkers=1
+node --test tests/public-site.contract.mjs
+npm run typecheck
+npm run build:site
+node --test tests/public-site.contract.mjs
+LANDING_BUILT=docs node --test tests/landing-copy.contract.mjs tests/landing-motion.contract.mjs
+```
+
+The landing tests use Node's type stripping, not the TypeScript compiler API. They
+check literal reviewed copy, initial/emitted HTML and the actual screenshot hook's
+completion, cancellation, fallback, reduced-motion and same-print reopen lifecycle.
+They simulate DOM/time/scheduling; real focus, inertness and animation appearance
+still require browser acceptance. Run these additional contracts alongside the
+native checks above; they are not implicitly included in `npm test`.
+
+Local preparation on 15 October 2026 passed 62 Vitest tests, 9 public-site contracts, typecheck, the site build and 9 landing copy/lifecycle checks.
+This is local build verification, not a new deployment claim.
+The full dependency audit retains 15 high affected-package records arising from
+two advisories in the Expo/React Native tooling graph. The owner accepted this
+residual for the web-page release, with no native dependency change or native app
+distribution. [RELEASE-SECURITY.md](RELEASE-SECURITY.md) records the risks and follow-up
+boundary; this is not a clean audit or a standing waiver for native releases.
