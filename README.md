@@ -106,6 +106,11 @@ npm run build:site
 expiry purges, restore and wipe. Its internal helpers do not enqueue again, and
 one rejected command does not stop later commands. All app commands use the same
 store instance; this is not a cross-process or multi-instance database lock.
+Serialization is not rollback: expiry can be saved before a later mutation fails.
+The store tracks successful writes within each queued command, so a later
+`not-committed` IO failure becomes an `unknown` command outcome if an earlier
+write already succeeded. That partial outcome requires reconciliation, not
+immediate retry. Prior commands' writes do not affect this classification.
 
 Undo is deliberately conservative: the exact `undoJobs` array returned by an
 undoable command is an in-memory, single-use handle bound to that store's current
@@ -137,7 +142,7 @@ prototype does not add a recovery journal or a new retention guarantee.
 Focused synthetic checks:
 
 ```sh
-NODE_ENV=test npx vitest run --maxWorkers=1 src/services/jobStore.integrity.test.ts src/services/storage.test.ts tests/app-recovery.test.tsx
+NODE_ENV=test npx vitest run --maxWorkers=1 src/services/jobStore.integrity.test.ts src/services/storage.test.ts tests/app-recovery.test.tsx tests/expiry-recovery.test.tsx
 env -u NODE_ENV VITEST_MAX_WORKERS=1 npm run check
 npm run export:ios -- --max-workers 1
 ```

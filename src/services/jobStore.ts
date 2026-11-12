@@ -84,6 +84,7 @@ export class StaleUndoError extends Error {
 export class JobStore {
   private pending: Promise<unknown> = Promise.resolve();
   private revision = 0;
+  private successfulWrites = 0;
   // Preserve restoreJobs(undoJobs), but treat the issued array identity as an
   // in-memory token. Never trust caller-editable snapshots as replacement data.
   private undoRecords = new WeakMap<ClinicalJob[], { revision: number; before: string; after: string | null }>();
@@ -91,7 +92,19 @@ export class JobStore {
   constructor(private storage: StorageDriver = encryptedStorageDriver, private nowMs: () => number = Date.now) {}
 
   private serialize<T>(operation: () => Promise<T>): Promise<T> {
-    const result = this.pending.then(operation);
+    const result = this.pending.then(async () => {
+      const writesBefore = this.successfulWrites;
+      try {
+        return await operation();
+      } catch (error) {
+        // A purge may have committed before a later write failed to stage.
+        // The last IO's precommit receipt is not a whole-command rollback.
+        if (this.successfulWrites !== writesBefore && error instanceof StorageMutationError && error.outcome === 'not-committed') {
+          throw new StorageMutationError('unknown', error);
+        }
+        throw error;
+      }
+    });
     this.pending = result.catch(() => undefined);
     return result;
   }
@@ -105,6 +118,7 @@ export class JobStore {
   private async writeSettings(settings: Partial<AppSettings>): Promise<AppSettings> {
     const normalised = normaliseSettings(settings);
     await this.storage.setItem(SETTINGS_KEY, JSON.stringify(normalised));
+    this.successfulWrites += 1;
     return normalised;
   }
 
@@ -121,11 +135,13 @@ export class JobStore {
     // A rejected write may have committed. Invalidate older undo even on failure.
     this.revision += 1;
     await this.storage.setItem(JOBS_KEY, JSON.stringify(jobs));
+    this.successfulWrites += 1;
   }
 
   private async removeJobs(): Promise<void> {
     this.revision += 1;
     await this.storage.removeItem(JOBS_KEY);
+    this.successfulWrites += 1;
   }
 
   private undoChange(jobs: ClinicalJob[], undoJobs: ClinicalJob[], after = JSON.stringify(jobs)): UndoableJobChange {

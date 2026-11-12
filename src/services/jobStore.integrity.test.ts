@@ -154,6 +154,57 @@ describe('whole-operation job transactions', () => {
     if (next.status === 'fulfilled') expect(texts(next.value)).toEqual(expected);
   });
 
+  it('does not attribute a preceding queued commit to a later precommit failure', async () => {
+    const { store, storage } = setup();
+    const setItem = storage.setItem.bind(storage);
+    let writes = 0;
+    storage.setItem = async (key, value) => {
+      if (++writes === 2) throw new StorageMutationError('not-committed', 'synthetic staging failure');
+      return setItem(key, value);
+    };
+    const [saved, failed] = await Promise.allSettled([store.addJob(draft('saved')), store.addJob(draft('unsaved'))]);
+    expect(saved.status).toBe('fulfilled');
+    expect(failed.status).toBe('rejected');
+    if (failed.status === 'rejected') expect(failed.reason).toMatchObject({ outcome: 'not-committed' });
+    expect(texts(storage.persisted())).toEqual(['saved']);
+  });
+
+  it.each([
+    ['add', (store: JobStore, id: string) => store.addJob(draft('new'))],
+    ['edit', (store: JobStore, id: string) => store.updateJob(id, { taskText: 'edited' })],
+    ['pin', (store: JobStore, id: string) => store.togglePinned(id)],
+    ['chase', (store: JobStore, id: string) => store.chaseJob(id)],
+    ['duplicate', (store: JobStore, id: string) => store.duplicateJob(id)],
+    ['status', (store: JobStore, id: string) => store.setStatusWithUndo(id, 'done')],
+    ['delete', (store: JobStore, id: string) => store.deleteJobWithUndo(id)],
+    ['clear', (store: JobStore, id: string) => store.clearCompletedWithUndo()],
+    ['wipe', (store: JobStore, id: string) => store.wipeAllWithUndo()],
+  ] as const)('does not report %s as wholly precommit after expiry already committed', async (name, mutate) => {
+    const { store, storage, advance } = setup();
+    await store.addJob(draft('expired'));
+    advance(12 * 60 * 60 * 1000);
+    const [live] = await store.addJob(draft('live'));
+    await store.setStatus(live.id, 'done');
+    const expected = storage.persisted().filter((job) => job.id === live.id);
+    advance(13 * 60 * 60 * 1000);
+    const setItem = storage.setItem.bind(storage);
+    let writes = 0;
+    storage.setItem = async (key, value) => {
+      if (++writes === 2) throw new StorageMutationError('not-committed', 'synthetic staging failure');
+      return setItem(key, value);
+    };
+    storage.removeItem = async () => { throw new StorageMutationError('not-committed', 'synthetic pre-delete failure'); };
+
+    // Enqueue the read before the mutation settles: the failed command must not
+    // poison the queue or replay/resurrect its already committed expiry purge.
+    const [failed, loaded] = await Promise.allSettled([mutate(store, live.id), store.getJobs()]);
+    expect(failed.status).toBe('rejected');
+    if (failed.status === 'rejected') expect(failed.reason).toMatchObject({ outcome: 'unknown' });
+    expect(loaded).toEqual({ status: 'fulfilled', value: expected });
+    expect(storage.persisted()).toEqual(expected);
+    expect(writes).toBe(name === 'wipe' ? 1 : 2);
+  });
+
   it('serializes shift settings with an overlapping settings write', async () => {
     const { store } = setup();
     await Promise.all([store.saveSettings({ compactMode: true }), store.startShift()]);
