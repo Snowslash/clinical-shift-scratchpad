@@ -18,6 +18,16 @@ export interface StorageDriver {
   removeItem(key: string): Promise<void>;
 }
 
+export type MutationOutcome = 'not-committed' | 'committed' | 'unknown';
+
+// A rejected native call is not a reliable rollback receipt. Callers must
+// reconcile unknown/committed outcomes instead of blindly replaying a command.
+export class StorageMutationError extends Error {
+  constructor(public readonly outcome: MutationOutcome, cause: unknown) {
+    super(`Storage ${outcome}: ${String(cause)}`);
+  }
+}
+
 export const STORAGE_DRIVER_KIND = 'secure-store' as const;
 
 const CHUNK_SIZE = 1800;
@@ -106,7 +116,9 @@ export const encryptedStorageDriver: StorageDriver = {
     return serialize(async () => {
       const SecureStore = getSecureStore();
       const secureKey = getSecureStoreKey(key);
-      const previousRaw = await SecureStore.getItemAsync(secureKey);
+      const previousRaw = await SecureStore.getItemAsync(secureKey).catch((error) => {
+        throw new StorageMutationError('not-committed', error);
+      });
       const generation = `${Date.now().toString(36)}${(++generationCounter).toString(36)}${Math.random().toString(36).slice(2)}`;
       // Count UTF-8 bytes, preserving separators and surrogate pairs.
       const chunks: string[] = [];
@@ -125,8 +137,10 @@ export const encryptedStorageDriver: StorageDriver = {
       }
       chunks.push(chunk);
       const writtenKeys: string[] = [];
+      let outcome: MutationOutcome = 'not-committed';
       try {
         if (chunks.length === 1 && !value.startsWith(MANIFEST_PREFIX)) {
+          outcome = 'unknown';
           await SecureStore.setItemAsync(secureKey, value);
         } else {
           for (const [index, part] of chunks.entries()) {
@@ -134,15 +148,19 @@ export const encryptedStorageDriver: StorageDriver = {
             writtenKeys.push(chunkKey);
             await SecureStore.setItemAsync(chunkKey, part);
           }
+          outcome = 'unknown';
           await SecureStore.setItemAsync(secureKey, `${MANIFEST_PREFIX}${JSON.stringify({ chunks: chunks.length, generation })}`);
         }
+        outcome = 'committed';
+        await removeChunkedValue(key, previousRaw);
       } catch (error) {
-        // Best effort rollback; never mask the original save failure.
-        await Promise.allSettled(writtenKeys.map((chunkKey) => SecureStore.deleteItemAsync(chunkKey)));
-        throw error;
+        // Only staged chunks are safe to roll back. A rejected root write may
+        // already reference the new generation; keep both generations then.
+        if (outcome === 'not-committed') {
+          await Promise.allSettled(writtenKeys.map((chunkKey) => SecureStore.deleteItemAsync(chunkKey)));
+        }
+        throw new StorageMutationError(outcome, error);
       }
-      // The new value is committed. Cleanup errors still reach the caller.
-      await removeChunkedValue(key, previousRaw);
     });
   },
 
@@ -150,9 +168,16 @@ export const encryptedStorageDriver: StorageDriver = {
     return serialize(async () => {
       const SecureStore = getSecureStore();
       const secureKey = getSecureStoreKey(key);
-      const previousRaw = await SecureStore.getItemAsync(secureKey);
-      await SecureStore.deleteItemAsync(secureKey);
-      await removeChunkedValue(key, previousRaw);
+      let outcome: MutationOutcome = 'not-committed';
+      try {
+        const previousRaw = await SecureStore.getItemAsync(secureKey);
+        outcome = 'unknown';
+        await SecureStore.deleteItemAsync(secureKey);
+        outcome = 'committed';
+        await removeChunkedValue(key, previousRaw);
+      } catch (error) {
+        throw new StorageMutationError(outcome, error);
+      }
     });
   },
 };

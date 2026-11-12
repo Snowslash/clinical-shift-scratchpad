@@ -20,7 +20,7 @@ Source: https://github.com/Snowslash/clinical-shift-scratchpad
 - compact card mode for dense lists
 - non-clinical sort presets: pinned first, waiting longest, recently touched, by location, by status and by tag
 - end-of-shift review text with an explicit clipboard warning
-- local undo for recent destructive/status actions
+- one brief, revision-bound local undo for a destructive/status action
 - manual appearance setting: system, light or dark
 - local auto-expiry, default 24 hours
 - local wipe and clear-completed actions with brief undo
@@ -92,12 +92,67 @@ npm run build:site
 - `src/theme.ts` — native light/dark colours matched to the pinned estate package, plus existing React Native layout styles; `tests/native-estate-theme.test.ts` checks token parity and text contrast
 - `src/types/job.ts` — job, urgency, status, tag, pin, waiting-for, shift, appearance, haptics and settings types
 - `src/services/storage.ts` — replaceable local storage abstraction
-- `src/services/jobStore.ts` — local job persistence, expiry, settings, shift timer, chase metadata, wipe-all and restorable undo snapshots
+- `src/services/jobStore.ts` — serialized local job transactions, expiry, settings, shift timer, chase metadata, wipe-all and revision-bound undo
+- `src/useAsyncAction.ts` — loading/pending/failure/reconciliation boundary shared by native UI actions
 - `src/utils/jobSorting.ts` — local sort presets, location grouping and filters
 - `src/utils/textShortcuts.ts` — plain-text shortcut insertion helpers
 - `src/utils/handover.ts` — end-of-shift review text generation
 - `landing/` — Vite + React + TypeScript source for the public project page
 - `docs/` — generated Cloudflare Pages output, clinical safety notes and deployment documents
+
+## Task integrity and recovery
+
+`JobStore` serializes the entire read → transform → save operation, including
+expiry purges, restore and wipe. Its internal helpers do not enqueue again, and
+one rejected command does not stop later commands. All app commands use the same
+store instance; this is not a cross-process or multi-instance database lock.
+
+Undo is deliberately conservative: the exact `undoJobs` array returned by an
+undoable command is an in-memory, single-use handle bound to that store's current
+revision and saved contents. The store keeps its own immutable snapshot. A copy,
+an earlier store instance, an intervening job write or an expired task cannot
+authorize restoration. The UI shows only the latest handle, briefly, and removes
+it after another job change. A known precommit failure of undo permits a retry;
+unknown/postcommit outcomes consume the handle. There is no snapshot merge or
+multi-step undo history.
+
+The UI keeps the draft and visible list on a known precommit failure. For an
+unknown or postcommit outcome it reloads durable jobs/settings before enabling
+another change. If that reload fails, only **Reload saved data** is offered;
+mutations remain blocked. After a successful reload, inspect the saved list
+(also shown inside an open draft) and acknowledge **I checked the saved list**
+before trying again. No mutation is automatically retried. This matters especially
+for additions and duplications: a rejected call may already have saved them.
+Failures remain visible, loading/pending ends on settlement, haptics are
+best-effort, and clipboard success is reported only after a confirmed copy.
+
+Storage keys, job/settings JSON and the `secure-chunks:v1:` manifest remain
+compatible; there is no migration or storage reset. A native root-write rejection
+is treated as uncertain: neither generation is deleted because either may be
+the durable one. Cleanup failures are surfaced even when replacement/deletion
+has committed. Such failures can leave orphan encrypted chunks; logical expiry
+or wipe is **not** proof of forensic erasure of every failed generation. This
+prototype does not add a recovery journal or a new retention guarantee.
+
+Focused synthetic checks:
+
+```sh
+NODE_ENV=test npx vitest run --maxWorkers=1 src/services/jobStore.integrity.test.ts src/services/storage.test.ts tests/app-recovery.test.tsx
+env -u NODE_ENV VITEST_MAX_WORKERS=1 npm run check
+npm run export:ios -- --max-workers 1
+```
+
+The interaction suite mounts the real React app/screens/store, replacing only
+native views and device APIs. The pinned `react-test-renderer` dev tool emits its
+upstream deprecation warning; it is not used by the app. These checks and native
+bundle exports are not physical-device evidence. Keyboard/scroll/accessibility,
+SecureStore failure behavior, clipboard and haptics still need iOS/Android device
+verification with synthetic data. The clinical app has no supported web runtime.
+
+Rollback is source-only: return to the previous app revision without clearing or
+rewriting stored data. The data format remains readable by that revision, but
+rolling back also restores the old concurrency/undo defects. No deployment is
+implied by local test or export success.
 
 ## Known limitations
 

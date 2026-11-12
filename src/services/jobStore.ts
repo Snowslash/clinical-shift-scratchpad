@@ -1,5 +1,5 @@
 import { AppSettings, ClinicalJob, DEFAULT_APPEARANCE_MODE, DEFAULT_AUTO_DELETE_HOURS, DEFAULT_COMPACT_MODE, DEFAULT_LOCATION_SHORTCUTS, DEFAULT_NOTE_SHORTCUTS, DEFAULT_STATUS_PHRASE_SHORTCUTS, MAX_NOTE_SHORTCUTS, MAX_STATUS_PHRASE_SHORTCUTS, JobDraft, JobStatus } from '../types/job';
-import { encryptedStorageDriver, StorageDriver } from './storage';
+import { encryptedStorageDriver, StorageDriver, StorageMutationError } from './storage';
 
 const JOBS_KEY = 'clinical-shift-scratchpad/jobs/v1';
 const SETTINGS_KEY = 'clinical-shift-scratchpad/settings/v1';
@@ -70,115 +70,200 @@ export const createJob = (draft: JobDraft, autoDeleteHours = DEFAULT_AUTO_DELETE
 
 export type UndoableJobChange = {
   jobs: ClinicalJob[];
+  // The exact issued array is a revision-bound, single-use undo handle. Copies
+  // and records from a previous JobStore instance cannot authorize restoration.
   undoJobs: ClinicalJob[];
 };
 
+export class StaleUndoError extends Error {
+  constructor() {
+    super('Undo unavailable: jobs changed or expired. Your current list has been kept.');
+  }
+}
+
 export class JobStore {
+  private pending: Promise<unknown> = Promise.resolve();
+  private revision = 0;
+  // Preserve restoreJobs(undoJobs), but treat the issued array identity as an
+  // in-memory token. Never trust caller-editable snapshots as replacement data.
+  private undoRecords = new WeakMap<ClinicalJob[], { revision: number; before: string; after: string | null }>();
+
   constructor(private storage: StorageDriver = encryptedStorageDriver, private nowMs: () => number = Date.now) {}
 
-  async getSettings(): Promise<AppSettings> {
+  private serialize<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.pending.then(operation);
+    this.pending = result.catch(() => undefined);
+    return result;
+  }
+
+  // Internal helpers never enqueue: the public command owns the whole operation.
+  private async readSettings(): Promise<AppSettings> {
     const raw = await this.storage.getItem(SETTINGS_KEY);
     return normaliseSettings(safeJsonParse<Partial<AppSettings> | null>(raw, null));
   }
 
-  async saveSettings(settings: Partial<AppSettings>): Promise<AppSettings> {
+  private async writeSettings(settings: Partial<AppSettings>): Promise<AppSettings> {
     const normalised = normaliseSettings(settings);
     await this.storage.setItem(SETTINGS_KEY, JSON.stringify(normalised));
     return normalised;
   }
 
-  async getJobs(): Promise<ClinicalJob[]> {
+  private async readJobs(): Promise<ClinicalJob[]> {
     const raw = await this.storage.getItem(JOBS_KEY);
     const jobs: ClinicalJob[] = raw === null ? [] : JSON.parse(raw);
     if (!Array.isArray(jobs)) throw new Error('Invalid stored job list');
     const active = jobs.filter((job) => !isExpired(job, this.nowMs()));
-    if (active.length !== jobs.length) {
-      await this.saveJobs(active);
-    }
+    if (active.length !== jobs.length) await this.writeJobs(active);
     return active;
   }
 
-  async saveJobs(jobs: ClinicalJob[]): Promise<void> {
+  private async writeJobs(jobs: ClinicalJob[]): Promise<void> {
+    // A rejected write may have committed. Invalidate older undo even on failure.
+    this.revision += 1;
     await this.storage.setItem(JOBS_KEY, JSON.stringify(jobs));
   }
 
-  async addJob(draft: JobDraft): Promise<ClinicalJob[]> {
-    const [settings, jobs] = await Promise.all([this.getSettings(), this.getJobs()]);
-    const next = [createJob(draft, settings.autoDeleteHours, new Date(this.nowMs())), ...jobs];
-    await this.saveJobs(next);
-    return next;
+  private async removeJobs(): Promise<void> {
+    this.revision += 1;
+    await this.storage.removeItem(JOBS_KEY);
   }
 
-  async updateJob(id: string, patch: Partial<Omit<ClinicalJob, 'id' | 'createdAt'>>): Promise<ClinicalJob[]> {
-    const jobs = await this.getJobs();
-    const updatedAt = new Date(this.nowMs()).toISOString();
-    const next = jobs.map((job) => (job.id === id ? { ...job, ...patch, updatedAt } : job));
-    await this.saveJobs(next);
-    return next;
+  private undoChange(jobs: ClinicalJob[], undoJobs: ClinicalJob[], after = JSON.stringify(jobs)): UndoableJobChange {
+    this.undoRecords.set(undoJobs, { revision: this.revision, before: JSON.stringify(undoJobs), after });
+    return { jobs, undoJobs };
   }
 
-  async restoreJobs(jobs: ClinicalJob[]): Promise<ClinicalJob[]> {
-    await this.saveJobs(jobs);
-    return jobs;
+  getSettings(): Promise<AppSettings> {
+    return this.serialize(() => this.readSettings());
   }
 
-  async setStatus(id: string, status: JobStatus): Promise<ClinicalJob[]> {
+  saveSettings(settings: Partial<AppSettings>): Promise<AppSettings> {
+    return this.serialize(() => this.writeSettings(settings));
+  }
+
+  getJobs(): Promise<ClinicalJob[]> {
+    return this.serialize(() => this.readJobs());
+  }
+
+  saveJobs(jobs: ClinicalJob[]): Promise<void> {
+    return this.serialize(() => this.writeJobs(jobs));
+  }
+
+  addJob(draft: JobDraft): Promise<ClinicalJob[]> {
+    return this.serialize(async () => {
+      const settings = await this.readSettings();
+      const jobs = await this.readJobs();
+      const next = [createJob(draft, settings.autoDeleteHours, new Date(this.nowMs())), ...jobs];
+      await this.writeJobs(next);
+      return next;
+    });
+  }
+
+  updateJob(id: string, patch: Partial<Omit<ClinicalJob, 'id' | 'createdAt'>>): Promise<ClinicalJob[]> {
+    return this.serialize(async () => {
+      const jobs = await this.readJobs();
+      const updatedAt = new Date(this.nowMs()).toISOString();
+      const next = jobs.map((job) => (job.id === id ? { ...job, ...patch, updatedAt } : job));
+      await this.writeJobs(next);
+      return next;
+    });
+  }
+
+  restoreJobs(undoJobs: ClinicalJob[]): Promise<ClinicalJob[]> {
+    return this.serialize(async () => {
+      const record = this.undoRecords.get(undoJobs);
+      const current = await this.storage.getItem(JOBS_KEY);
+      const jobs: ClinicalJob[] = record ? JSON.parse(record.before) : [];
+      if (!record || record.revision !== this.revision || record.after !== current
+        || jobs.some((job) => isExpired(job, this.nowMs()))) {
+        this.undoRecords.delete(undoJobs);
+        throw new StaleUndoError();
+      }
+      this.undoRecords.delete(undoJobs);
+      try {
+        await this.writeJobs(jobs);
+      } catch (error) {
+        // Only a definite precommit failure can retain this one undo handle.
+        // Unknown/postcommit outcomes remain consumed; never replay them.
+        if (error instanceof StorageMutationError && error.outcome === 'not-committed') {
+          this.undoRecords.set(undoJobs, { ...record, revision: this.revision });
+        }
+        throw error;
+      }
+      return jobs;
+    });
+  }
+
+  setStatus(id: string, status: JobStatus): Promise<ClinicalJob[]> {
     return this.updateJob(id, { status });
   }
 
-  async togglePinned(id: string): Promise<ClinicalJob[]> {
-    const jobs = await this.getJobs();
-    const updatedAt = new Date(this.nowMs()).toISOString();
-    const next = jobs.map((job) => (job.id === id ? { ...job, pinned: !job.pinned, updatedAt } : job));
-    await this.saveJobs(next);
-    return next;
+  togglePinned(id: string): Promise<ClinicalJob[]> {
+    return this.serialize(async () => {
+      const jobs = await this.readJobs();
+      const updatedAt = new Date(this.nowMs()).toISOString();
+      const next = jobs.map((job) => (job.id === id ? { ...job, pinned: !job.pinned, updatedAt } : job));
+      await this.writeJobs(next);
+      return next;
+    });
   }
 
-  async bumpJob(id: string): Promise<ClinicalJob[]> {
+  bumpJob(id: string): Promise<ClinicalJob[]> {
     return this.updateJob(id, {});
   }
 
-  async chaseJob(id: string): Promise<ClinicalJob[]> {
-    const jobs = await this.getJobs();
-    const updatedAt = new Date(this.nowMs()).toISOString();
-    const next = jobs.map((job) => (job.id === id ? { ...job, updatedAt, lastChasedAt: updatedAt, chaseCount: (job.chaseCount ?? 0) + 1 } : job));
-    await this.saveJobs(next);
-    return next;
+  chaseJob(id: string): Promise<ClinicalJob[]> {
+    return this.serialize(async () => {
+      const jobs = await this.readJobs();
+      const updatedAt = new Date(this.nowMs()).toISOString();
+      const next = jobs.map((job) => (job.id === id ? { ...job, updatedAt, lastChasedAt: updatedAt, chaseCount: (job.chaseCount ?? 0) + 1 } : job));
+      await this.writeJobs(next);
+      return next;
+    });
   }
 
-  async startShift(): Promise<AppSettings> {
-    const settings = await this.getSettings();
-    return this.saveSettings({ ...settings, currentShiftStartedAt: new Date(this.nowMs()).toISOString() });
+  startShift(): Promise<AppSettings> {
+    return this.serialize(async () => {
+      const settings = await this.readSettings();
+      return this.writeSettings({ ...settings, currentShiftStartedAt: new Date(this.nowMs()).toISOString() });
+    });
   }
 
-  async endShift(): Promise<AppSettings> {
-    const settings = await this.getSettings();
-    return this.saveSettings({ ...settings, currentShiftStartedAt: undefined });
+  endShift(): Promise<AppSettings> {
+    return this.serialize(async () => {
+      const settings = await this.readSettings();
+      return this.writeSettings({ ...settings, currentShiftStartedAt: undefined });
+    });
   }
 
-  async duplicateJob(id: string): Promise<ClinicalJob[]> {
-    const [settings, jobs] = await Promise.all([this.getSettings(), this.getJobs()]);
-    const source = jobs.find((job) => job.id === id);
-    if (!source) return jobs;
-    const duplicate = createJob({
-      taskText: source.taskText,
-      patientIdentifier: source.patientIdentifier,
-      location: source.location,
-      urgency: source.urgency,
-      jobType: source.jobType,
-      waitingFor: source.waitingFor,
-    }, settings.autoDeleteHours, new Date(this.nowMs()));
-    const next = [duplicate, ...jobs];
-    await this.saveJobs(next);
-    return next;
+  duplicateJob(id: string): Promise<ClinicalJob[]> {
+    return this.serialize(async () => {
+      const settings = await this.readSettings();
+      const jobs = await this.readJobs();
+      const source = jobs.find((job) => job.id === id);
+      if (!source) return jobs;
+      const duplicate = createJob({
+        taskText: source.taskText,
+        patientIdentifier: source.patientIdentifier,
+        location: source.location,
+        urgency: source.urgency,
+        jobType: source.jobType,
+        waitingFor: source.waitingFor,
+      }, settings.autoDeleteHours, new Date(this.nowMs()));
+      const next = [duplicate, ...jobs];
+      await this.writeJobs(next);
+      return next;
+    });
   }
 
-  async setStatusWithUndo(id: string, status: JobStatus): Promise<UndoableJobChange> {
-    const undoJobs = await this.getJobs();
-    const updatedAt = new Date(this.nowMs()).toISOString();
-    const jobs = undoJobs.map((job) => (job.id === id ? { ...job, status, updatedAt } : job));
-    await this.saveJobs(jobs);
-    return { jobs, undoJobs };
+  setStatusWithUndo(id: string, status: JobStatus): Promise<UndoableJobChange> {
+    return this.serialize(async () => {
+      const undoJobs = await this.readJobs();
+      const updatedAt = new Date(this.nowMs()).toISOString();
+      const jobs = undoJobs.map((job) => (job.id === id ? { ...job, status, updatedAt } : job));
+      await this.writeJobs(jobs);
+      return this.undoChange(jobs, undoJobs);
+    });
   }
 
   async deleteJob(id: string): Promise<ClinicalJob[]> {
@@ -186,11 +271,13 @@ export class JobStore {
     return change.jobs;
   }
 
-  async deleteJobWithUndo(id: string): Promise<UndoableJobChange> {
-    const undoJobs = await this.getJobs();
-    const jobs = undoJobs.filter((job) => job.id !== id);
-    await this.saveJobs(jobs);
-    return { jobs, undoJobs };
+  deleteJobWithUndo(id: string): Promise<UndoableJobChange> {
+    return this.serialize(async () => {
+      const undoJobs = await this.readJobs();
+      const jobs = undoJobs.filter((job) => job.id !== id);
+      await this.writeJobs(jobs);
+      return this.undoChange(jobs, undoJobs);
+    });
   }
 
   async clearCompleted(): Promise<ClinicalJob[]> {
@@ -198,21 +285,26 @@ export class JobStore {
     return change.jobs;
   }
 
-  async clearCompletedWithUndo(): Promise<UndoableJobChange> {
-    const undoJobs = await this.getJobs();
-    const jobs = undoJobs.filter((job) => job.status !== 'done');
-    await this.saveJobs(jobs);
-    return { jobs, undoJobs };
+  clearCompletedWithUndo(): Promise<UndoableJobChange> {
+    return this.serialize(async () => {
+      const undoJobs = await this.readJobs();
+      const jobs = undoJobs.filter((job) => job.status !== 'done');
+      await this.writeJobs(jobs);
+      return this.undoChange(jobs, undoJobs);
+    });
   }
 
-  async wipeAll(): Promise<void> {
-    await this.storage.removeItem(JOBS_KEY);
+  wipeAll(): Promise<void> {
+    return this.serialize(() => this.removeJobs());
   }
 
-  async wipeAllWithUndo(): Promise<UndoableJobChange> {
-    const undoJobs = await this.getJobs();
-    await this.storage.removeItem(JOBS_KEY);
-    return { jobs: [], undoJobs };
+  wipeAllWithUndo(): Promise<UndoableJobChange> {
+    return this.serialize(async () => {
+      const undoJobs = await this.readJobs();
+      await this.removeJobs();
+      this.undoRecords.set(undoJobs, { revision: this.revision, before: JSON.stringify(undoJobs), after: null });
+      return { jobs: [], undoJobs };
+    });
   }
 }
 

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
+import type { ActionState } from './useAsyncAction';
 import { FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { LongPressGestureHandler, State } from 'react-native-gesture-handler';
 import { APPEARANCE_MODES, AppearanceMode, AppSettings, ClinicalJob, DEFAULT_APPEARANCE_MODE, DEFAULT_AUTO_DELETE_HOURS, DEFAULT_COMPACT_MODE, DEFAULT_LOCATION_SHORTCUTS, DEFAULT_NOTE_SHORTCUTS, DEFAULT_STATUS_PHRASE_SHORTCUTS, MAX_RADIAL_NOTE_SHORTCUTS, JobFilter, JobStatus, JobType, JOB_TYPES, SORT_PRESETS, SortPreset, STATUSES, Urgency } from './types/job';
@@ -260,7 +261,7 @@ function JobCard({ job, theme, compactMode, onEdit, onDelete, onStatus, onCycleS
   );
 }
 
-function JobFormModal({ visible, theme, form, onChange, onClose, onSave, locationShortcuts, noteShortcuts, statusPhraseShortcuts }: { visible: boolean; theme: Theme; form: JobFormState; onChange: (form: JobFormState) => void; onClose: () => void; onSave: (keepOpen?: boolean) => void; locationShortcuts: string[]; noteShortcuts: string[]; statusPhraseShortcuts: string[] }) {
+function JobFormModal({ visible, theme, form, pending, saveDisabled, notice, onChange, onClose, onSave, locationShortcuts, noteShortcuts, statusPhraseShortcuts }: { visible: boolean; theme: Theme; form: JobFormState; pending: boolean; saveDisabled: boolean; notice: ReactNode; onChange: (form: JobFormState) => void; onClose: () => void; onSave: (keepOpen?: boolean) => void; locationShortcuts: string[]; noteShortcuts: string[]; statusPhraseShortcuts: string[] }) {
   const styles = stylesForTheme(theme);
   const taskInputRef = useRef<TextInput>(null);
   const locationInputRef = useRef<TextInput>(null);
@@ -303,17 +304,19 @@ function JobFormModal({ visible, theme, form, onChange, onClose, onSave, locatio
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} presentationStyle="pageSheet">
       <KeyboardAvoidingView style={[styles.modalSafe, { backgroundColor: theme.background }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}>
         <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}> 
-          <TouchableOpacity onPress={() => onSave(false)} style={[styles.modalHeaderButton, styles.modalSaveButton]}><Text style={styles.modalSaveText}>Save</Text></TouchableOpacity>
+          <TouchableOpacity disabled={saveDisabled} accessibilityState={{ disabled: saveDisabled }} onPress={() => onSave(false)} style={[styles.modalHeaderButton, styles.modalSaveButton, saveDisabled && { opacity: 0.5 }]}><Text style={styles.modalSaveText}>Save</Text></TouchableOpacity>
           <Text style={[styles.modalTitle, { color: theme.text }]}>{form.id ? 'Edit job' : 'Quick capture'}</Text>
-          <TouchableOpacity onPress={onClose} style={styles.modalHeaderButton}><Text style={{ color: theme.text, fontWeight: '700' }}>Cancel</Text></TouchableOpacity>
+          <TouchableOpacity disabled={pending} onPress={onClose} style={styles.modalHeaderButton}><Text style={{ color: theme.text, fontWeight: '700' }}>Cancel</Text></TouchableOpacity>
         </View>
 
+        {notice}
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets contentContainerStyle={styles.formContent}>
+          <View pointerEvents={pending ? 'none' : 'auto'} accessibilityState={{ busy: pending }}>
           <Text style={[styles.label, { color: theme.text }]}>Job note</Text>
           <Text style={[styles.fieldHint, { color: theme.muted }]}>Long-press for your first 8 note shortcut favourites.</Text>
           <LongPressGestureHandler minDurationMs={420} shouldCancelWhenOutside={false} onHandlerStateChange={handleLongPress('taskText')}>
             <View collapsable={false}>
-              <TextInput ref={taskInputRef} value={form.taskText} onChangeText={(taskText) => onChange({ ...form, taskText })} placeholder="e.g. Review bloods / chase CT / update family" placeholderTextColor={theme.placeholder} multiline scrollEnabled style={[styles.mainInput, { color: theme.text, backgroundColor: theme.card, borderColor: theme.border }]} textAlignVertical="top" returnKeyType="default" />
+              <TextInput editable={!pending} ref={taskInputRef} value={form.taskText} onChangeText={(taskText) => onChange({ ...form, taskText })} placeholder="e.g. Review bloods / chase CT / update family" placeholderTextColor={theme.placeholder} multiline scrollEnabled style={[styles.mainInput, { color: theme.text, backgroundColor: theme.card, borderColor: theme.border }]} textAlignVertical="top" returnKeyType="default" />
             </View>
           </LongPressGestureHandler>
 
@@ -321,7 +324,7 @@ function JobFormModal({ visible, theme, form, onChange, onClose, onSave, locatio
           <Text style={[styles.fieldHint, { color: theme.muted }]}>Plain status phrase only. Long-press for local phrases.</Text>
           <LongPressGestureHandler minDurationMs={420} shouldCancelWhenOutside={false} onHandlerStateChange={handleLongPress('waitingFor')}>
             <View collapsable={false}>
-              <TextInput ref={waitingInputRef} value={form.waitingFor} onChangeText={(waitingFor) => onChange({ ...form, waitingFor })} placeholder="CT report / bloods / reg review" placeholderTextColor={theme.placeholder} style={[styles.input, { color: theme.text, backgroundColor: theme.card, borderColor: theme.border }]} />
+              <TextInput editable={!pending} ref={waitingInputRef} value={form.waitingFor} onChangeText={(waitingFor) => onChange({ ...form, waitingFor })} placeholder="CT report / bloods / reg review" placeholderTextColor={theme.placeholder} style={[styles.input, { color: theme.text, backgroundColor: theme.card, borderColor: theme.border }]} />
             </View>
           </LongPressGestureHandler>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalControls} contentContainerStyle={styles.horizontalControlContent}>
@@ -336,13 +339,13 @@ function JobFormModal({ visible, theme, form, onChange, onClose, onSave, locatio
           <Text style={[styles.fieldHint, { color: theme.muted }]}>Long-press for local location shortcuts.</Text>
           <LongPressGestureHandler minDurationMs={420} shouldCancelWhenOutside={false} onHandlerStateChange={handleLongPress('location')}>
             <View collapsable={false}>
-              <TextInput ref={locationInputRef} value={form.location} onChangeText={(location) => onChange({ ...form, location })} placeholder="Ward / area / bed" placeholderTextColor={theme.placeholder} style={[styles.input, { color: theme.text, backgroundColor: theme.card, borderColor: theme.border }]} />
+              <TextInput editable={!pending} ref={locationInputRef} value={form.location} onChangeText={(location) => onChange({ ...form, location })} placeholder="Ward / area / bed" placeholderTextColor={theme.placeholder} style={[styles.input, { color: theme.text, backgroundColor: theme.card, borderColor: theme.border }]} />
             </View>
           </LongPressGestureHandler>
 
           <Text style={[styles.label, { color: theme.text }]}>Patient identifier optional</Text>
           <Text style={[styles.helpText, { color: theme.muted }]}>Use the minimum necessary identifier for your local shift context. Avoid full details unless genuinely needed.</Text>
-          <TextInput value={form.patientIdentifier} onChangeText={(patientIdentifier) => onChange({ ...form, patientIdentifier })} placeholder="Minimum necessary identifier" placeholderTextColor={theme.placeholder} style={[styles.input, { color: theme.text, backgroundColor: theme.card, borderColor: theme.border }]} />
+          <TextInput editable={!pending} value={form.patientIdentifier} onChangeText={(patientIdentifier) => onChange({ ...form, patientIdentifier })} placeholder="Minimum necessary identifier" placeholderTextColor={theme.placeholder} style={[styles.input, { color: theme.text, backgroundColor: theme.card, borderColor: theme.border }]} />
 
           <Text style={[styles.label, { color: theme.text }]}>Job type optional</Text>
           <Text style={[styles.fieldHint, { color: theme.muted }]}>Plain local label only — not triage, priority, or decision support.</Text>
@@ -364,10 +367,11 @@ function JobFormModal({ visible, theme, form, onChange, onClose, onSave, locatio
           </View>
 
           {!form.id ? (
-            <TouchableOpacity style={styles.primaryButtonLarge} onPress={() => onSave(true)}>
+            <TouchableOpacity disabled={saveDisabled} style={[styles.primaryButtonLarge, saveDisabled && { opacity: 0.5 }]} onPress={() => onSave(true)}>
               <Text style={styles.primaryButtonText}>Add + keep open</Text>
             </TouchableOpacity>
           ) : null}
+          </View>
         </ScrollView>
 
         <ShortcutMenu visible={shortcutMenu !== null} theme={theme} title={menuTitle} options={menuOptions} onSelect={(shortcut) => shortcutMenu === 'location' ? applyLocationShortcut(shortcut) : shortcutMenu === 'waitingFor' ? applyWaitingShortcut(shortcut) : applyTaskShortcut(shortcut)} onClose={() => setShortcutMenu(null)} />
@@ -450,12 +454,12 @@ function ShortcutMenu({ visible, theme, title, options, onSelect, onClose }: { v
   );
 }
 
-function UndoBar({ theme, message, count, onUndo, onDismiss }: { theme: Theme; message: string; count: number; onUndo: () => void; onDismiss: () => void }) {
+function UndoBar({ theme, disabled, message, onUndo, onDismiss }: { theme: Theme; disabled: boolean; message: string; onUndo: () => void; onDismiss: () => void }) {
   const styles = stylesForTheme(theme);
   return (
     <View style={[styles.undoBar, { backgroundColor: theme.undoBackground, borderColor: theme.border }]}> 
-      <Text style={[styles.undoText, { color: theme.text }]} numberOfLines={1}>{message}{count > 1 ? ` · ${count} undo steps` : ''}</Text>
-      <TouchableOpacity accessibilityRole="button" style={styles.undoButton} onPress={onUndo}>
+      <Text style={[styles.undoText, { color: theme.text }]}>{message} · until next job change or expiry</Text>
+      <TouchableOpacity accessibilityRole="button" disabled={disabled} style={styles.undoButton} onPress={onUndo}>
         <Text style={styles.undoButtonText}>Undo</Text>
       </TouchableOpacity>
       <TouchableOpacity accessibilityRole="button" style={styles.undoDismiss} onPress={onDismiss}>
@@ -465,7 +469,7 @@ function UndoBar({ theme, message, count, onUndo, onDismiss }: { theme: Theme; m
   );
 }
 
-function SettingsScreen({ theme, settings, onSaveHours, onSaveLocationShortcuts, onSaveNoteShortcuts, onSaveStatusPhraseShortcuts, onSaveCompactMode, onSaveAppearanceMode, onSaveHapticsEnabled, onWipeAll }: { theme: Theme; settings: AppSettings; onSaveHours: (value: string) => void; onSaveLocationShortcuts: (value: string) => void; onSaveNoteShortcuts: (value: string) => void; onSaveStatusPhraseShortcuts: (value: string) => void; onSaveCompactMode: (compactMode: boolean) => void; onSaveAppearanceMode: (appearanceMode: AppearanceMode) => void; onSaveHapticsEnabled: (enabled: boolean) => void; onWipeAll: () => void }) {
+function SettingsScreen({ theme, disabled, settings, onSaveHours, onSaveLocationShortcuts, onSaveNoteShortcuts, onSaveStatusPhraseShortcuts, onSaveCompactMode, onSaveAppearanceMode, onSaveHapticsEnabled, onWipeAll }: { theme: Theme; disabled: boolean; settings: AppSettings; onSaveHours: (value: string) => void; onSaveLocationShortcuts: (value: string) => void; onSaveNoteShortcuts: (value: string) => void; onSaveStatusPhraseShortcuts: (value: string) => void; onSaveCompactMode: (compactMode: boolean) => void; onSaveAppearanceMode: (appearanceMode: AppearanceMode) => void; onSaveHapticsEnabled: (enabled: boolean) => void; onWipeAll: () => void }) {
   const styles = stylesForTheme(theme);
   const [hoursText, setHoursText] = useState(String(settings.autoDeleteHours));
   const [locationShortcutsText, setLocationShortcutsText] = useState(() => settings.locationShortcuts.join(', '));
@@ -496,6 +500,7 @@ function SettingsScreen({ theme, settings, onSaveHours, onSaveLocationShortcuts,
       <View style={[styles.settingsCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
         <Text style={[styles.label, { color: theme.text }]}>Auto-delete interval in hours</Text>
         <TextInput
+          editable={!disabled}
           keyboardType="numeric"
           value={hoursText}
           onChangeText={setHoursText}
@@ -532,6 +537,7 @@ function SettingsScreen({ theme, settings, onSaveHours, onSaveLocationShortcuts,
       <View style={[styles.settingsCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
         <Text style={[styles.label, { color: theme.text }]}>Location shortcuts</Text>
         <TextInput
+          editable={!disabled}
           value={locationShortcutsText}
           onChangeText={setLocationShortcutsText}
           onBlur={() => onSaveLocationShortcuts(locationShortcutsText)}
@@ -545,6 +551,7 @@ function SettingsScreen({ theme, settings, onSaveHours, onSaveLocationShortcuts,
       <View style={[styles.settingsCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
         <Text style={[styles.label, { color: theme.text }]}>Job note shortcuts</Text>
         <TextInput
+          editable={!disabled}
           value={noteShortcutsText}
           onChangeText={setNoteShortcutsText}
           onBlur={() => onSaveNoteShortcuts(noteShortcutsText)}
@@ -559,6 +566,7 @@ function SettingsScreen({ theme, settings, onSaveHours, onSaveLocationShortcuts,
       <View style={[styles.settingsCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
         <Text style={[styles.label, { color: theme.text }]}>Waiting/status phrase shortcuts</Text>
         <TextInput
+          editable={!disabled}
           value={statusPhraseText}
           onChangeText={setStatusPhraseText}
           onBlur={() => onSaveStatusPhraseShortcuts(statusPhraseText)}
@@ -601,4 +609,22 @@ function Badge({ label, color, backgroundColor }: { label: string; color: string
 }
 
 
-export { JobsScreen, HandoverScreen, SettingsScreen, JobFormModal, UndoBar };
+function ActionNotice({ theme, state, onReload, onAcknowledge, savedJobs }: { theme: Theme; state: ActionState; onReload: () => void; onAcknowledge: () => void; savedJobs?: ClinicalJob[] }) {
+  const styles = stylesForTheme(theme);
+  if (!state.message) return null;
+  return (
+    <View style={[styles.settingsCard, { backgroundColor: theme.card, borderColor: theme.border, margin: 10 }]}>
+      <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={[styles.helpText, { color: theme.text }]}>{state.message}</Text>
+      {state.recovery === 'review' && savedJobs ? (
+        <ScrollView style={{ maxHeight: 160 }}>
+          <Text style={[styles.label, { color: theme.text }]}>Currently saved jobs</Text>
+          {savedJobs.length ? savedJobs.map((job) => <Text key={job.id} style={[styles.helpText, { color: theme.text }]}>{job.taskText} · {job.status}{job.location ? ` · ${job.location}` : ''}{job.waitingFor ? ` · ${job.waitingFor}` : ''}</Text>) : <Text style={{ color: theme.text }}>No saved jobs.</Text>}
+        </ScrollView>
+      ) : null}
+      {state.phase === 'failed' && state.recovery === 'reload' ? <TouchableOpacity accessibilityRole="button" onPress={onReload} style={styles.primaryButtonLarge}><Text style={styles.primaryButtonText}>Reload saved data</Text></TouchableOpacity> : null}
+      {state.recovery === 'review' ? <TouchableOpacity accessibilityRole="button" onPress={onAcknowledge} style={styles.primaryButtonLarge}><Text style={styles.primaryButtonText}>I checked the saved list</Text></TouchableOpacity> : null}
+    </View>
+  );
+}
+
+export { JobsScreen, HandoverScreen, SettingsScreen, JobFormModal, UndoBar, ActionNotice };

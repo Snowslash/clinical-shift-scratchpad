@@ -15,7 +15,8 @@ import { AppearanceMode, AppSettings, ClinicalJob, DEFAULT_APPEARANCE_MODE, DEFA
 import { jobStore } from './src/services/jobStore';
 import { filterJobs, groupJobsByLocation, sortJobs } from './src/utils/jobSorting';
 import { buildHandoverText } from './src/utils/handover';
-import { JobsScreen, HandoverScreen, SettingsScreen, JobFormModal, UndoBar, JobFormState } from './src/components';
+import { JobsScreen, HandoverScreen, SettingsScreen, JobFormModal, UndoBar, JobFormState, ActionNotice } from './src/components';
+import { useAsyncAction } from './src/useAsyncAction';
 import { darkTheme, lightTheme, stylesForTheme } from './src/theme';
 
 type Screen = 'jobs' | 'review' | 'settings';
@@ -55,7 +56,7 @@ const settingsAppearanceIsDark = (systemScheme: ReturnType<typeof useColorScheme
 export default function App() {
   const colorScheme = useColorScheme();
   const [screen, setScreen] = useState<Screen>('jobs');
-  const [jobs, setJobs] = useState<ClinicalJob[]>([]);
+  const [jobs, setStoredJobs] = useState<ClinicalJob[]>([]);
   const [settings, setSettings] = useState<AppSettings>({ autoDeleteHours: DEFAULT_AUTO_DELETE_HOURS, locationShortcuts: DEFAULT_LOCATION_SHORTCUTS, noteShortcuts: DEFAULT_NOTE_SHORTCUTS, compactMode: DEFAULT_COMPACT_MODE, appearanceMode: DEFAULT_APPEARANCE_MODE, statusPhraseShortcuts: DEFAULT_STATUS_PHRASE_SHORTCUTS, hapticsEnabled: true });
   const dark = settingsAppearanceIsDark(colorScheme, settings.appearanceMode);
   const theme = dark ? darkTheme : lightTheme;
@@ -63,22 +64,26 @@ export default function App() {
   const [filter, setFilter] = useState<JobFilter>('all');
   const [form, setForm] = useState<JobFormState>(emptyForm);
   const [formVisible, setFormVisible] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [undoStack, setUndoStack] = useState<UndoState[]>([]);
   const [sortPreset, setSortPreset] = useState<SortPreset>('pinnedFirst');
   const [groupByLocationEnabled, setGroupByLocationEnabled] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const reconcile = useCallback(async () => {
     const [storedJobs, storedSettings] = await Promise.all([jobStore.getJobs(), jobStore.getSettings()]);
-    setJobs(storedJobs);
+    setStoredJobs(storedJobs);
     setSettings(storedSettings);
-    setLoading(false);
+    setUndoStack([]);
   }, []);
+  const actions = useAsyncAction(reconcile);
+  const { reload } = actions;
+  const setJobs = (next: ClinicalJob[]) => {
+    setStoredJobs(next);
+    setUndoStack([]);
+  };
 
   useEffect(() => {
-    load().catch((error) => Alert.alert('Storage error', String(error)));
-  }, [load]);
+    void reload();
+  }, [reload]);
 
   useEffect(() => {
     if (undoStack.length === 0) return undefined;
@@ -99,17 +104,17 @@ export default function App() {
 
   const showUndo = (message: string, undoJobs: ClinicalJob[]) => {
     if (undoJobs.length === 0) return;
-    setUndoStack((stack) => [...stack.slice(-4), { id: `${Date.now()}-${message}`, message, jobs: undoJobs }]);
+    setUndoStack([{ id: `${Date.now()}-${message}`, message, jobs: undoJobs }]);
   };
 
-  const undoLastChange = async () => {
+  const undoLastChange = () => actions.run('Undoing change', async () => {
     const undo = undoStack.at(-1);
     if (!undo) return;
     const restored = await jobStore.restoreJobs(undo.jobs);
     setJobs(restored);
     setUndoStack((stack) => stack.slice(0, -1));
     pulse('warning');
-  };
+  });
 
   const visibleJobs = useMemo(() => sortJobs(filterJobs(jobs, filter), sortPreset), [jobs, filter, sortPreset]);
   const handoverText = useMemo(() => buildHandoverText(jobs), [jobs]);
@@ -119,11 +124,13 @@ export default function App() {
   const getRecentLocation = () => sortJobs(jobs).find((job) => job.location)?.location ?? '';
 
   const openAdd = (useRecentLocation = false) => {
+    if (actions.isBlocked()) return;
     setForm({ ...emptyForm, location: useRecentLocation ? getRecentLocation() : '' });
     setFormVisible(true);
   };
 
   const openEdit = (job: ClinicalJob) => {
+    if (actions.isBlocked()) return;
     setForm({
       id: job.id,
       taskText: job.taskText,
@@ -136,7 +143,7 @@ export default function App() {
     setFormVisible(true);
   };
 
-  const saveForm = async (keepOpen = false) => {
+  const saveForm = (keepOpen = false) => actions.run('Saving', async () => {
     const taskText = form.taskText.trim();
     if (!taskText) {
       Alert.alert('Task needed', 'Free text is the only required field.');
@@ -171,9 +178,9 @@ export default function App() {
     }
     setFormVisible(false);
     setForm(emptyForm);
-  };
+  });
 
-  const setJobStatus = async (id: string, status: JobStatus) => {
+  const setJobStatus = (id: string, status: JobStatus) => actions.run('Updating status', async () => {
     if (status === 'done') {
       const change = await jobStore.setStatusWithUndo(id, status);
       setJobs(change.jobs);
@@ -182,122 +189,127 @@ export default function App() {
     }
     setJobs(await jobStore.setStatus(id, status));
     pulse('light');
-  };
+  });
 
-  const togglePinned = async (id: string) => {
+  const togglePinned = (id: string) => actions.run('Updating pin', async () => {
     setJobs(await jobStore.togglePinned(id));
     pulse('light');
-  };
+  });
 
-  const bumpJob = async (id: string) => {
+  const bumpJob = (id: string) => actions.run('Bumping job', async () => {
     setJobs(await jobStore.bumpJob(id));
     pulse('light');
-  };
+  });
 
-  const duplicateJob = async (id: string) => {
+  const duplicateJob = (id: string) => actions.run('Duplicating job', async () => {
     setJobs(await jobStore.duplicateJob(id));
     pulse('success');
-  };
+  });
 
-  const chaseJob = async (id: string) => {
+  const chaseJob = (id: string) => actions.run('Updating chase', async () => {
     setJobs(await jobStore.chaseJob(id));
     pulse('light');
-  };
+  });
 
-  const startShift = async () => {
+  const startShift = () => actions.run('Starting shift', async () => {
     setSettings(await jobStore.startShift());
     pulse('success');
-  };
+  });
 
   const endShift = async () => {
+    if (actions.isBlocked()) return;
     Alert.alert('End local shift?', 'This only clears the shift timer. Jobs stay on this device unless you clear or wipe them.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'End shift', onPress: async () => { setSettings(await jobStore.endShift()); pulse('warning'); } },
+      { text: 'End shift', onPress: () => actions.run('Ending shift', async () => { setSettings(await jobStore.endShift()); pulse('warning'); }) },
     ]);
   };
 
-  const saveCompactMode = async (compactMode: boolean) => {
+  const saveCompactMode = (compactMode: boolean) => actions.run('Saving settings', async () => {
     const next = await jobStore.saveSettings({ ...settings, compactMode });
     setSettings(next);
-  };
+  });
 
-  const saveAppearanceMode = async (appearanceMode: AppearanceMode) => {
+  const saveAppearanceMode = (appearanceMode: AppearanceMode) => actions.run('Saving settings', async () => {
     const next = await jobStore.saveSettings({ ...settings, appearanceMode });
     setSettings(next);
-  };
+  });
 
-  const saveHapticsEnabled = async (hapticsEnabled: boolean) => {
+  const saveHapticsEnabled = (hapticsEnabled: boolean) => actions.run('Saving settings', async () => {
     const next = await jobStore.saveSettings({ ...settings, hapticsEnabled });
     setSettings(next);
-  };
+  });
 
-  const saveStatusPhraseShortcuts = async (value: string) => {
+  const saveStatusPhraseShortcuts = (value: string) => actions.run('Saving settings', async () => {
     const next = await jobStore.saveSettings({ ...settings, statusPhraseShortcuts: parseShortcutText(value) });
     setSettings(next);
-  };
+  });
 
   const deleteJob = (job: ClinicalJob) => {
+    if (actions.isBlocked()) return;
     Alert.alert('Delete job?', 'This removes the job from this device. You can undo briefly.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: async () => {
+        onPress: () => actions.run('Deleting job', async () => {
           const change = await jobStore.deleteJobWithUndo(job.id);
           setJobs(change.jobs);
           showUndo('Deleted job', change.undoJobs);
-        },
+        }),
       },
     ]);
   };
 
   const clearCompleted = () => {
+    if (actions.isBlocked()) return;
     Alert.alert('Clear completed jobs?', 'All jobs marked done will be deleted. You can undo briefly.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Clear done',
         style: 'destructive',
-        onPress: async () => {
+        onPress: () => actions.run('Clearing completed jobs', async () => {
           const change = await jobStore.clearCompletedWithUndo();
           setJobs(change.jobs);
           showUndo('Cleared completed jobs', change.undoJobs);
-        },
+        }),
       },
     ]);
   };
 
   const wipeAll = () => {
+    if (actions.isBlocked()) return;
     Alert.alert('Wipe all local data?', 'This deletes every scratchpad job on this device. You can undo briefly until the undo bar disappears.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Wipe all',
         style: 'destructive',
-        onPress: async () => {
+        onPress: () => actions.run('Wiping jobs', async () => {
           const change = await jobStore.wipeAllWithUndo();
           setJobs(change.jobs);
           showUndo('Wiped all jobs', change.undoJobs);
-        },
+        }),
       },
     ]);
   };
 
-  const saveAutoDeleteHours = async (value: string) => {
+  const saveAutoDeleteHours = (value: string) => actions.run('Saving settings', async () => {
     const parsed = Number(value.replace(/[^0-9.]/g, ''));
     const next = await jobStore.saveSettings({ ...settings, autoDeleteHours: parsed });
     setSettings(next);
-  };
+  });
 
-  const saveLocationShortcuts = async (value: string) => {
+  const saveLocationShortcuts = (value: string) => actions.run('Saving settings', async () => {
     const next = await jobStore.saveSettings({ ...settings, locationShortcuts: parseShortcutText(value) });
     setSettings(next);
-  };
+  });
 
-  const saveNoteShortcuts = async (value: string) => {
+  const saveNoteShortcuts = (value: string) => actions.run('Saving settings', async () => {
     const next = await jobStore.saveSettings({ ...settings, noteShortcuts: parseShortcutText(value) });
     setSettings(next);
-  };
+  });
 
   const copyHandover = () => {
+    if (actions.isBlocked()) return;
     Alert.alert(
       'Check identifiers before copying',
       'The clipboard may be visible to other apps or device services. Do not copy excessive patient-identifiable information.',
@@ -305,10 +317,11 @@ export default function App() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Copy locally',
-          onPress: async () => {
-            await Clipboard.setStringAsync(handoverText);
+          onPress: () => actions.run('Copying', async () => {
+            const copied = await Clipboard.setStringAsync(handoverText);
+            if (!copied) throw new Error('Clipboard copy not confirmed');
             Alert.alert('Copied', 'Handover text copied to the local clipboard.');
-          },
+          }, 'clipboard'),
         },
       ],
     );
@@ -328,16 +341,19 @@ export default function App() {
 
       <View style={[styles.tabs, { borderBottomColor: theme.border }]}> 
         {(['jobs', 'review', 'settings'] as Screen[]).map((item) => (
-          <TouchableOpacity key={item} style={[styles.tab, screen === item && styles.tabActive]} onPress={() => setScreen(item)}>
+          <TouchableOpacity key={item} disabled={actions.busy} style={[styles.tab, screen === item && styles.tabActive]} onPress={() => setScreen(item)}>
             <Text style={[styles.tabText, { color: screen === item ? theme.primaryText : theme.text }]}>{item}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
+      {!formVisible ? <ActionNotice theme={theme} state={actions.state} onReload={reload} onAcknowledge={actions.acknowledge} /> : null}
+
+      <View style={{ flex: 1 }} pointerEvents={actions.busy ? 'none' : 'auto'} accessibilityState={{ busy: actions.busy }}>
       {screen === 'jobs' ? (
         <JobsScreen
           theme={theme}
-          loading={loading}
+          loading={actions.state.phase === 'loading'}
           jobs={visibleJobs}
           groups={visibleGroups}
           filter={filter}
@@ -370,17 +386,21 @@ export default function App() {
       ) : null}
 
       {screen === 'settings' ? (
-        <SettingsScreen theme={theme} settings={settings} onSaveHours={saveAutoDeleteHours} onSaveLocationShortcuts={saveLocationShortcuts} onSaveNoteShortcuts={saveNoteShortcuts} onSaveStatusPhraseShortcuts={saveStatusPhraseShortcuts} onSaveCompactMode={saveCompactMode} onSaveAppearanceMode={saveAppearanceMode} onSaveHapticsEnabled={saveHapticsEnabled} onWipeAll={wipeAll} />
+        <SettingsScreen theme={theme} disabled={actions.blocked} settings={settings} onSaveHours={saveAutoDeleteHours} onSaveLocationShortcuts={saveLocationShortcuts} onSaveNoteShortcuts={saveNoteShortcuts} onSaveStatusPhraseShortcuts={saveStatusPhraseShortcuts} onSaveCompactMode={saveCompactMode} onSaveAppearanceMode={saveAppearanceMode} onSaveHapticsEnabled={saveHapticsEnabled} onWipeAll={wipeAll} />
       ) : null}
+      </View>
 
-      {undoStack.length > 0 ? <UndoBar theme={theme} message={undoStack.at(-1)?.message ?? 'Undo available'} count={undoStack.length} onUndo={undoLastChange} onDismiss={() => setUndoStack([])} /> : null}
+      {undoStack.length > 0 ? <UndoBar theme={theme} disabled={actions.blocked} message={undoStack.at(-1)?.message ?? 'Undo available'} onUndo={undoLastChange} onDismiss={() => setUndoStack([])} /> : null}
 
       <JobFormModal
         visible={formVisible}
         theme={theme}
         form={form}
-        onChange={setForm}
-        onClose={() => setFormVisible(false)}
+        pending={actions.busy}
+        saveDisabled={actions.blocked}
+        notice={<ActionNotice theme={theme} state={actions.state} onReload={reload} onAcknowledge={actions.acknowledge} savedJobs={jobs} />}
+        onChange={(next) => { if (!actions.busy) setForm(next); }}
+        onClose={() => { if (!actions.busy) setFormVisible(false); }}
         onSave={saveForm}
         locationShortcuts={settings.locationShortcuts}
         noteShortcuts={settings.noteShortcuts}
